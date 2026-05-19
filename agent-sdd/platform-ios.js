@@ -2589,4 +2589,15 @@ const PLATFORM = {
     updatePreview('projectconfig');
     showToast('Existing project.config.md loaded — review and save or skip', 'success');
   },
+
+  taskDefaults: {
+    qualityGate: [
+      { id: 'no-force-unwrap',   label: 'No force unwrap (`!`) — use `guard let`, `if let`, or `??`' },
+      { id: 'no-dispatch-main',  label: 'No `DispatchQueue.main` in ViewModel — use `@MainActor`' },
+      { id: 'no-biz-view',       label: 'No business logic in View or ViewController' },
+      { id: 'no-userdefaults',   label: 'No `UserDefaults` direct access — use storage abstraction' },
+      { id: 'exhaustive-switch', label: 'All `switch` on enums are exhaustive — no `default` on known types' },
+      { id: 'test-naming',       label: 'Tests follow `test_functionName_scenario_expectedResult` naming' },
+    ],
+  },
 };

@@ -12,7 +12,7 @@
 - [x] Bug
 - [ ] Feature
 - [ ] Refactor
-- [ ] Chore
+- [ ] Task
 
 ## Description
 

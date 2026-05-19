@@ -3110,4 +3110,16 @@ const PLATFORM = {
     updatePreview('projectconfig');
     showToast('Existing project.config.md loaded — review and save or skip', 'success');
   },
+
+  taskDefaults: {
+    qualityGate: [
+      { id: 'no-bang-bang',    label: 'No `!!` operators introduced' },
+      { id: 'no-livedata',     label: 'No new `LiveData` — new state uses `StateFlow`' },
+      { id: 'no-globalscope',  label: 'No `GlobalScope` — use `viewModelScope` or `lifecycleScope`' },
+      { id: 'no-hardcoded',    label: 'No hardcoded strings, colors, or dimensions' },
+      { id: 'exhaustive-when', label: 'All `when` on sealed types are exhaustive — no `else`' },
+      { id: 'no-biz-ui',       label: 'No business logic in UI layer' },
+      { id: 'test-naming',     label: 'Tests follow `functionName_scenario_expectedResult` naming' },
+    ],
+  },
 };

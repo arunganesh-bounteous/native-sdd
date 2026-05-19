@@ -129,9 +129,14 @@ function saveDraft() {
   _draftTimer = setTimeout(() => {
     const draft = { fields: {}, pills: {} };
 
-    // All text/number inputs and textareas that carry an id
+    // All text inputs and textareas that carry an id
     document.querySelectorAll('input[id]:not([type="checkbox"]):not([type="radio"]), textarea[id]').forEach(el => {
       draft.fields[el.id] = el.value;
+    });
+
+    // Checkbox states — used by task quality gate toggles
+    document.querySelectorAll('input[id][type="checkbox"]').forEach(el => {
+      draft.fields[el.id] = el.checked;
     });
 
     // Selected pills — keyed by group name (from the input's name attribute)
@@ -162,12 +167,16 @@ function restoreDraft() {
   catch { return; }
   if (!draft.fields && !draft.pills) return;
 
-  // ── Restore plain text/number fields ──────────────────────────────────────
+  // ── Restore plain text/number fields and checkbox states ─────────────────
   Object.entries(draft.fields || {}).forEach(([id, value]) => {
-    // Skip approach-card textareas — handled after pills are restored below.
     if (id.startsWith('approach-')) return;
     const el = document.getElementById(id);
-    if (el) el.value = value;
+    if (!el) return;
+    if (typeof value === 'boolean') {
+      if (el.type === 'checkbox') el.checked = value;
+    } else {
+      el.value = value;
+    }
   });
 
   // ── Restore pill selections ────────────────────────────────────────────────
@@ -215,11 +224,32 @@ function attachDraftListeners(screenId) {
 }
 
 // ══════════════════════════════════════════════════════
+//  BROWSER COMPATIBILITY
+// ══════════════════════════════════════════════════════
+const hasFSA = 'showDirectoryPicker' in window;
+
+// Show a warning banner when File System Access API is unavailable (Safari, Firefox).
+// Called once after DOMContentLoaded — banner is hidden by default in HTML.
+function applyBrowserCompat() {
+  if (!hasFSA) {
+    const banner = document.getElementById('safariBanner');
+    if (banner) banner.style.display = 'block';
+    // Grey out the Select button tooltip
+    const selectBtn = document.querySelector('button[onclick="grantFolder()"]');
+    if (selectBtn) selectBtn.title = 'Direct folder access not supported in this browser — files will download to your Downloads folder instead.';
+  }
+}
+
+// ══════════════════════════════════════════════════════
 //  FILE SYSTEM ACCESS API
 // ══════════════════════════════════════════════════════
 async function grantFolder() {
+  if (!hasFSA) {
+    showToast('Direct folder access is not supported in Safari or Firefox — files will download to your Downloads folder when you save each step.', 'info');
+    return;
+  }
   try {
-    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    const handle = await window.showDirectoryPicker();
     state.dirHandle = handle;
     const badge = document.getElementById('sddBadge');
     badge.textContent = '📂 ' + handle.name;
@@ -237,7 +267,7 @@ async function grantFolder() {
     // Platform hook — e.g. analyzeProject()
     PLATFORM.onFolderGranted?.();
   } catch (e) {
-    if (e.name !== 'AbortError') showToast('Could not access folder', 'error');
+    if (e.name !== 'AbortError') showToast('Could not access folder — try selecting the folder again.', 'error');
   }
 }
 
@@ -317,19 +347,17 @@ function downloadFallback(filename, content) {
 }
 
 async function handleSave(stepId, filename, content) {
-  const hasFSA = 'showDirectoryPicker' in window;
-
   // No folder selected yet — prompt the user to pick one before saving
   if (hasFSA && !state.dirHandle) {
     showToast('Select your project root or agent-sdd/ folder to save directly…', 'info');
     try {
-      const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+      const handle = await window.showDirectoryPicker();
       state.dirHandle = handle;
       const badge = document.getElementById('sddBadge');
       if (badge) { badge.textContent = '📂 ' + handle.name; badge.className = 'folder-badge granted'; }
       showToast('Folder set: ' + handle.name + ' — saving…', 'success');
     } catch (e) {
-      // User cancelled the picker — fall back to download
+      // User cancelled or picker failed — fall back to download
       downloadFallback(filename, content);
       showToast('No folder selected — file downloaded to Downloads instead', 'info');
       return;
@@ -654,6 +682,10 @@ function init() {
     PLATFORM.buildScreens[id]?.(fp);
   });
 
+  // Build platform-agnostic task creation screen
+  buildTaskScreen(fp);
+  attachDraftListeners('screen-newtask');
+
   // Attach draft save listeners to every non-welcome, non-done screen
   stepIds.forEach(id => {
     attachDraftListeners('screen-' + id);
@@ -664,6 +696,274 @@ function init() {
 
   buildSidebar();
   updateDoneScreen();
+}
+
+// ══════════════════════════════════════════════════════
+//  TASK SCREEN
+//  Platform-agnostic task MD creation form.
+//  Quality gate defaults come from PLATFORM.taskDefaults.
+// ══════════════════════════════════════════════════════
+
+function goToTaskScreen() {
+  state.current = 'newtask';
+  document.querySelectorAll('.step-screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-newtask')?.classList.add('active');
+  const fp = document.querySelector('.form-panel');
+  if (fp) fp.scrollTop = 0;
+  buildSidebar();
+  document.getElementById('headerTitle').textContent = 'Create Task';
+  document.getElementById('headerDesc').textContent = 'Generate a task MD file ready for Claude to execute';
+  const tutLink = document.getElementById('headerTutorial');
+  if (tutLink) { tutLink.href = 'tutorial.html#writing-tasks'; tutLink.style.display = 'inline-flex'; }
+  document.getElementById('previewPanel').classList.remove('collapsed');
+  updateTaskPreview();
+  document.querySelectorAll('.tool-link').forEach(l => l.classList.remove('tool-active'));
+  document.getElementById('tool-newtask')?.classList.add('tool-active');
+}
+
+function generateTaskMd() {
+  const id    = document.getElementById('task-id')?.value.trim()    || '[PROJ]-1234';
+  const title = document.getElementById('task-title')?.value.trim() || '[Title]';
+  const type  = getRadio('task-type') || 'Feature';
+  const desc  = document.getElementById('task-desc')?.value.trim()  || '[Description here]';
+
+  const lines = id => (document.getElementById(id)?.value.trim() || '').split('\n').map(l => l.trim()).filter(Boolean);
+
+  const criteria  = lines('task-criteria');
+  const oos       = lines('task-oos');
+  const areas     = document.getElementById('task-areas')?.value.trim() || '[Affected areas]';
+  const testReq   = getRadio('task-test-req') || 'N';
+  const testLevel = getRadio('task-level')    || 'Unit';
+  const scenarios = lines('task-scenarios');
+  const refs      = lines('task-refs');
+  const notes     = document.getElementById('task-notes')?.value.trim();
+  const qgCustom  = lines('task-qg-custom');
+
+  const qgDefaults = (PLATFORM?.taskDefaults?.qualityGate || [])
+    .filter(item => document.getElementById('task-qg-' + item.id)?.checked !== false)
+    .map(item => `- [ ] ${item.label}`);
+  const allQg = [...qgDefaults, ...qgCustom.map(l => `- [ ] ${l}`)];
+
+  const types = ['Feature', 'Bug', 'Refactor', 'Task'];
+
+  return `# Task: ${id} — ${title}
+
+## Type
+
+${types.map(t => `- [${t === type ? 'x' : ' '}] ${t}`).join('\n')}
+
+## Description
+
+${desc}
+
+## Acceptance Criteria
+
+${criteria.length ? criteria.map(c => `- [ ] ${c}`).join('\n') : '- [ ] [Criterion 1]'}
+
+## Quality Gate
+
+${allQg.length ? allQg.join('\n') : '- [ ] [Add quality gate items]'}
+
+## Out of Scope
+
+${oos.length ? oos.map(o => `- ${o}`).join('\n') : '- [None]'}
+
+## Affected Areas
+
+${areas}
+
+## Testing
+
+Required: ${testReq}
+
+Level: ${testLevel}
+
+Scenarios:
+${scenarios.length ? scenarios.map(s => `- [ ] ${s}`).join('\n') : '- [ ] [Scenario 1]'}
+
+## Designs / References
+
+${refs.length ? refs.map(r => `- ${r}`).join('\n') : '- None'}
+
+## Notes
+
+${notes || '[Notes here or remove section]'}
+`;
+}
+
+function updateTaskPreview() {
+  if (state.current !== 'newtask') return;
+  document.getElementById('previewContent').innerHTML = renderMarkdown(generateTaskMd());
+}
+
+async function saveTask() {
+  const id = document.getElementById('task-id')?.value.trim();
+  if (!id) { showToast('Enter a Ticket ID first', 'error'); return; }
+  await handleSave('newtask-' + id, 'tasks/' + id + '.md', generateTaskMd());
+}
+
+function resetTaskForm() {
+  ['task-id','task-title','task-desc','task-criteria','task-qg-custom',
+   'task-oos','task-areas','task-scenarios','task-refs','task-notes'].forEach(fid => {
+    const el = document.getElementById(fid);
+    if (el) el.value = '';
+  });
+  ['task-type','task-test-req','task-level'].forEach(group => {
+    document.querySelectorAll(`[id^="pill-${group}_"]`).forEach(p => {
+      p.classList.remove('selected');
+      const inp = p.querySelector('input');
+      if (inp) inp.checked = false;
+    });
+  });
+  (PLATFORM?.taskDefaults?.qualityGate || []).forEach(item => {
+    const el = document.getElementById('task-qg-' + item.id);
+    if (el) el.checked = true;
+  });
+  updateTaskPreview();
+  showToast('Form cleared — ready for next task', 'info');
+}
+
+function buildTaskScreen(fp) {
+  const qgItems = PLATFORM?.taskDefaults?.qualityGate || [];
+  fp.innerHTML += `
+  <div class="step-screen" id="screen-newtask">
+    <div style="max-width:700px">
+
+      <div class="form-section">
+        <h3>Ticket</h3>
+        <div style="display:flex;gap:12px">
+          <div class="form-row" style="width:160px;flex-shrink:0;margin-bottom:0">
+            <label>Ticket ID</label>
+            <input type="text" id="task-id" placeholder="[PROJ]-1234" oninput="updateTaskPreview();saveDraft()">
+          </div>
+          <div class="form-row" style="flex:1;margin-bottom:0">
+            <label>Title</label>
+            <input type="text" id="task-title" placeholder="Short descriptive title" oninput="updateTaskPreview();saveDraft()">
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:12px">
+          <label>Type</label>
+          <div class="radio-group">
+            ${['Feature','Bug','Refactor','Task'].map(t => pill(t, t, 'task-type', 'radio')).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Description</h3>
+        <div class="form-row">
+          <label>What needs to be done and why — 1–5 sentences, specific about what changes</label>
+          <textarea id="task-desc" rows="4"
+            placeholder="e.g. Add a store_selected Firebase event fired when the user taps a store. The event must include store_id as a property."
+            oninput="updateTaskPreview();saveDraft()"></textarea>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Acceptance Criteria</h3>
+        <div class="form-row">
+          <label>One criterion per line — each must be verifiable by a specific file, function, or test</label>
+          <textarea id="task-criteria" rows="5"
+            placeholder="TrackStoreSelectedEvent is called in SelectStoreFragment.onStoreClicked() with the correct store_id&#10;Event is NOT sent to Adjust — Firebase only&#10;Unit test covers success and cancellation paths"
+            oninput="updateTaskPreview();saveDraft()"></textarea>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Quality Gate</h3>
+        <p class="form-sub">Platform defaults — uncheck any that don't apply to this task</p>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:4px 14px;margin-bottom:12px">
+          ${qgItems.map(item => `
+          <div class="toggle-row">
+            <div class="toggle-label" style="font-size:12px;flex:1;padding-right:12px">${item.label}</div>
+            <label class="toggle">
+              <input type="checkbox" id="task-qg-${item.id}" checked onchange="updateTaskPreview();saveDraft()">
+              <div class="toggle-track"></div><div class="toggle-thumb"></div>
+            </label>
+          </div>`).join('')}
+        </div>
+        <div class="form-row">
+          <label>Additional task-specific checks (one per line)</label>
+          <textarea id="task-qg-custom" rows="2"
+            placeholder="e.g. AppSettingsFragment does not call loadContactOptions() after this change — verify by grep"
+            oninput="updateTaskPreview();saveDraft()"></textarea>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Out of Scope</h3>
+        <div class="form-row">
+          <label>One item per line — explicitly state what NOT to do</label>
+          <textarea id="task-oos" rows="3"
+            placeholder="Do not add Adjust tracking — Firebase only&#10;Do not modify existing trackBasketTransfer() method"
+            oninput="updateTaskPreview();saveDraft()"></textarea>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Affected Areas</h3>
+        <div class="form-row">
+          <label>Module names, feature names, key files — helps agent load the right context files</label>
+          <input type="text" id="task-areas"
+            placeholder="e.g. analytics, store selection, SelectStoreFragment, StoreViewModel"
+            oninput="updateTaskPreview();saveDraft()">
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Testing</h3>
+        <div style="display:flex;gap:20px;flex-wrap:wrap">
+          <div class="form-row" style="margin-bottom:0">
+            <label>Required</label>
+            <div class="radio-group">
+              ${pill('Yes','Y','task-test-req','radio')}
+              ${pill('No','N','task-test-req','radio')}
+            </div>
+          </div>
+          <div class="form-row" style="margin-bottom:0">
+            <label>Level</label>
+            <div class="radio-group">
+              ${pill('Unit','Unit','task-level','radio')}
+              ${pill('Integration','Integration','task-level','radio')}
+              ${pill('Both','Both','task-level','radio')}
+            </div>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:12px">
+          <label>Scenarios (one per line)</label>
+          <textarea id="task-scenarios" rows="3"
+            placeholder="event fires with correct store_id when store is tapped&#10;event does not fire when store selection is cancelled"
+            oninput="updateTaskPreview();saveDraft()"></textarea>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Designs / References</h3>
+        <div class="form-row">
+          <label>One link or file path per line</label>
+          <textarea id="task-refs" rows="2"
+            placeholder="https://figma.com/file/...&#10;docs/api-contract.md"
+            oninput="updateTaskPreview();saveDraft()"></textarea>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Notes</h3>
+        <div class="form-row">
+          <label>Backend changes, known gotchas, ticket dependencies — leave blank if none</label>
+          <textarea id="task-notes" rows="3"
+            placeholder="The endpoint is not yet deployed to production — test against staging only."
+            oninput="updateTaskPreview();saveDraft()"></textarea>
+        </div>
+      </div>
+
+      <div class="btn-actions">
+        <button class="btn btn-success" onclick="saveTask()">💾 Save Task</button>
+        <button class="btn btn-secondary" onclick="resetTaskForm()">↺ New Task</button>
+      </div>
+
+    </div>
+  </div>`;
 }
 
 // ══════════════════════════════════════════════════════
@@ -711,4 +1011,6 @@ document.addEventListener('keydown', e => {
 // DOMContentLoaded — do NOT call init() here.
 // The platform overlay is already visible; init() is called by choosePlatform()
 // once the user selects a platform and its script has loaded.
-window.addEventListener('DOMContentLoaded', () => { /* waiting for platform selection */ });
+window.addEventListener('DOMContentLoaded', () => {
+  applyBrowserCompat();
+});

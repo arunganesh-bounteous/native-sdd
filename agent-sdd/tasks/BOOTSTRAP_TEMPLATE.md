@@ -5,7 +5,7 @@
 - [ ] Bug
 - [ ] Feature
 - [ ] Refactor
-- [x] Chore
+- [x] Task
 
 ## Description
 

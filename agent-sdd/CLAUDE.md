@@ -92,7 +92,7 @@ a `context/<module>.md` file afterward using `context/TEMPLATE.md`.
 Read the task file the developer has provided (e.g., `tasks/[PROJ]-1234.md`).
 Extract:
 - Ticket ID and title
-- Type (Feature / Bug / Refactor / Chore)
+- Type (Feature / Bug / Refactor / Task)
 - Description
 - Acceptance criteria (these are your definition of done)
 - Out of scope (treat these as hard constraints — do not implement them)

@@ -208,8 +208,45 @@
   /* Coverage slider */
   .slider-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
   .slider-row label { width: 100px; font-size: 12px; color: var(--text-dim); flex-shrink: 0; }
-  .slider-row input[type="range"] { flex: 1; accent-color: var(--accent); }
+  .slider-row input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent); /* Chrome, Edge, Firefox */
+    /* Safari fallback — tint the track */
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    outline: none;
+  }
+  .slider-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+  .slider-row input[type="range"]::-moz-range-thumb {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none; cursor: pointer;
+  }
   .slider-val { width: 36px; text-align: right; font-size: 12px; color: var(--accent); font-family: var(--mono); }
+
+  /* Safari / unsupported browser banner */
+  #safariBanner {
+    display: none;
+    background: rgba(245,158,11,0.08);
+    border-bottom: 1px solid rgba(245,158,11,0.25);
+    padding: 8px 20px;
+    font-size: 12px;
+    color: #fbbf24;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  #safariBanner a { color: #fbbf24; }
 
   /* Step screens */
   .step-screen { display: none; }
@@ -426,6 +463,15 @@
   }
   /* shift app content up so footer doesn't overlap */
   .app { padding-bottom: 28px; }
+
+  /* ── Tools section nav links ── */
+  .tool-link {
+    display: block; font-size: 12px; color: var(--text-muted);
+    text-decoration: none; padding: 5px 0;
+    transition: color 0.15s;
+  }
+  .tool-link:hover { color: var(--text); }
+  .tool-link.tool-active { color: var(--accent); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -465,7 +511,11 @@
     <div class="sidebar-steps" id="sidebarSteps">
       <!-- populated by JS -->
     </div>
-    <div style="padding: 16px 16px 8px; border-top: 1px solid var(--border); margin-top: auto;">
+    <div style="padding: 12px 16px 8px; border-top: 1px solid var(--border); margin-top: auto;">
+      <div style="font-size: 10px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px;">Tools</div>
+      <a id="tool-newtask" class="tool-link" href="#" onclick="goToTaskScreen(); return false;">📝 Create Task</a>
+    </div>
+    <div style="padding: 8px 16px 12px; border-top: 1px solid var(--border);">
       <div style="font-size: 10px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px;">Guides</div>
       <a href="tutorial.html" style="display:block; font-size:12px; color:var(--text-muted); text-decoration:none; padding: 4px 0;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">📖 Main Tutorial</a>
       <a href="tutorial-spec-kit.html" style="display:block; font-size:12px; color:var(--text-muted); text-decoration:none; padding: 4px 0;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">📐 Spec-Kit Files Guide</a>
@@ -475,6 +525,10 @@
 
   <!-- ── Main ── -->
   <div class="main">
+    <div id="safariBanner">
+      ⚠️ Safari detected — direct folder saving is not supported. Each step will <strong>download a file</strong> to your Downloads folder instead.
+      Use <strong>Chrome</strong> or <strong>Edge</strong> to save files directly into your project.
+    </div>
     <div class="main-header">
       <div>
         <h2 id="headerTitle">Welcome</h2>
