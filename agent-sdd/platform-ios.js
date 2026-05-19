@@ -172,6 +172,95 @@ function getApproachRows(group) {
   return rows;
 }
 
+// ── Parse existing DATA_MODEL.md → entity + endpoint row objects ──
+function parseDataModelMD(text) {
+  const entities  = [];
+  const endpoints = [];
+
+  const domainSection = text.match(/^## Domain Entities([\s\S]*?)(?=^## )/m)?.[1] ?? '';
+  for (const block of domainSection.split(/^### /m).slice(1)) {
+    const name = block.split('\n')[0].trim();
+    if (!name || name.includes('[')) continue;
+    const dataClassMatch = block.match(/(?:data class|struct) \w+[\s\S]*?\{?([\s\S]*?)\}?\)/);
+    const simpleMatch    = block.match(/data class \w+\s*\(([\s\S]*?)\)/);
+    if (simpleMatch) {
+      const fields = simpleMatch[1]
+        .split('\n')
+        .map(l => l.trim().replace(/^va[lr]\s+|^let\s+|^var\s+/, '').replace(/,$/, '').trim())
+        .filter(l => l && l.includes(':'))
+        .join(', ');
+      entities.push({ name, fields });
+    } else {
+      entities.push({ name, fields: '' });
+    }
+  }
+
+  for (const block of text.split(/^#### /m).slice(1)) {
+    const firstLine = block.split('\n')[0].trim();
+    const spaceIdx  = firstLine.indexOf(' ');
+    if (spaceIdx === -1) continue;
+    const method = firstLine.slice(0, spaceIdx).toUpperCase();
+    const path   = firstLine.slice(spaceIdx + 1).trim();
+    if (!['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) continue;
+
+    const reqBody  = block.match(/Request:\s*```(?:json)?\s*([\s\S]*?)```/)?.[1]?.trim()      ?? '';
+    const respBody = block.match(/Response 200:\s*```(?:json)?\s*([\s\S]*?)```/)?.[1]?.trim() ?? '';
+    const errRows  = [...block.matchAll(/\|\s*`([^`\n]+)`\s*\|\s*([^|\n]+)\|/g)];
+    const errors   = errRows
+      .map(m => `${m[1].trim()} — ${m[2].trim()}`)
+      .filter(e => !e.toLowerCase().startsWith('error code'))
+      .join(', ');
+
+    endpoints.push({ method, path, reqBody, respBody, errors });
+  }
+
+  return { entities, endpoints };
+}
+
+// ── Parse existing MODULE_MAP.md → module row objects ────
+function parseModuleMapMD(text) {
+  const modules = [];
+  const normalisePattern = raw => {
+    const l = raw.toLowerCase();
+    if (l.includes('single activity')) return 'Single Activity';
+    if (l.includes('mvvm'))            return 'MVVM';
+    if (l.includes('mvp'))             return 'MVP';
+    if (l.includes('clean'))           return 'Clean';
+    if (l.includes('repository'))      return 'Repository';
+    if (l.includes('infrastructure'))  return 'Infrastructure';
+    return 'MVVM';
+  };
+  const normaliseDI = raw => {
+    const l = raw.toLowerCase();
+    if (l.includes('manual')) return 'Manual';
+    if (l.includes('none'))   return 'None';
+    return raw.trim() || 'Manual';
+  };
+  const getField = (block, field) => {
+    const re = new RegExp(`\\|\\s*${field}\\s*\\|\\s*([^|\\n]+?)\\s*\\|`, 'i');
+    return (block.match(re)?.[1] ?? '').replace(/`/g, '').trim();
+  };
+  const sections = text.split(/^### /m).slice(1);
+  for (const section of sections) {
+    const name = section.split('\n')[0].trim();
+    if (!name || name.startsWith('#') || name.startsWith('<!--')) continue;
+    const path       = getField(section, 'Path');
+    const purpose    = getField(section, 'Purpose');
+    const keywords   = getField(section, 'Keywords');
+    const keyClasses = getField(section, 'Key classes');
+    const depends    = getField(section, 'Depends on');
+    const rawPat     = getField(section, 'Pattern');
+    const rawDI      = getField(section, 'DI');
+    if (purpose === '[describe purpose]' && keyClasses === '[fill in]') continue;
+    modules.push({
+      name, path, purpose, keywords, keyClasses, depends,
+      pattern: normalisePattern(rawPat),
+      di: normaliseDI(rawDI),
+    });
+  }
+  return modules;
+}
+
 // ── Project analysis ────────────────────────────────────
 
 async function scanForURLProtocols(dirHandle, maxDepth = 6) {
@@ -427,23 +516,41 @@ async function analyzeProject() {
   if (hasRxSwift)              setToggle('rxswift', true);
   if (hasUIKit && hasSwiftUI)  setToggle('uikit', true);
 
-  // ── Step 13: Modules list ─────────────────────────────────
-  if (allModules.length > 0) {
+  // ── Step 13: Modules list — prefer existing MODULE_MAP.md ──
+  const existingModuleMap = await tryReadFile(state.dirHandle, 'agent-sdd', 'spec-kit', 'MODULE_MAP.md');
+  const parsedModules = existingModuleMap ? parseModuleMapMD(existingModuleMap) : [];
+
+  if (parsedModules.length > 0) {
+    const list = document.getElementById('modules-list');
+    if (list) { list.innerHTML = ''; moduleCounter = 0; }
+    parsedModules.forEach(m => addModuleRow(m));
+    state.detectedModuleDetails = parsedModules.map(m => ({
+      name: m.name, type: m.pattern, diCol: m.di, notes: m.purpose,
+    }));
+  } else if (allModules.length > 0) {
     const list = document.getElementById('modules-list');
     if (list) { list.innerHTML = ''; moduleCounter = 0; }
     allModules.forEach(name => addModuleRow({ name, path: name + '/', keywords: guessModuleKeywords(name) }));
+    state.detectedModuleDetails = allModules.map(name => {
+      const n = name.toLowerCase();
+      let type = '—', notes = '';
+      if      (n.match(/feature|view|screen/))     { type = 'MVVM';       notes = 'Feature module'; }
+      else if (n.match(/core|common|shared/))      { type = 'Repository'; notes = 'Shared domain layer'; }
+      else if (n.match(/network|api|service/))     { type = '—';          notes = 'Network layer'; }
+      else if (n.match(/kit|util|helper|support/)) { type = '—';          notes = 'Shared utilities'; }
+      return { name, type, diCol: di !== 'Manual' ? di : '—', notes };
+    });
   }
 
-  state.detectedInterceptors  = await scanForURLProtocols(state.dirHandle);
-  state.detectedModuleDetails = allModules.map(name => {
-    const n = name.toLowerCase();
-    let type = '—', notes = '';
-    if      (n.match(/feature|view|screen/))     { type = 'MVVM';       notes = 'Feature module'; }
-    else if (n.match(/core|common|shared/))      { type = 'Repository'; notes = 'Shared domain layer'; }
-    else if (n.match(/network|api|service/))     { type = '—';          notes = 'Network layer'; }
-    else if (n.match(/kit|util|helper|support/)) { type = '—';          notes = 'Shared utilities'; }
-    return { name, type, diCol: di !== 'Manual' ? di : '—', notes };
-  });
+  // ── Load existing DATA_MODEL.md ──────────────────────
+  const existingDataModel = await tryReadFile(state.dirHandle, 'agent-sdd', 'spec-kit', 'DATA_MODEL.md');
+  if (existingDataModel) {
+    const { entities } = parseDataModelMD(existingDataModel);
+    const entList = document.getElementById('entities-list');
+    if (entList && entities.length > 0) { entList.innerHTML = ''; entityCounter = 0; entities.forEach(e => addEntityRow(e)); }
+  }
+
+  state.detectedInterceptors = await scanForURLProtocols(state.dirHandle);
 
   updatePreview('architecture');
   updatePreview('modules');
@@ -452,11 +559,14 @@ async function analyzeProject() {
   renderApproachRows('state');
   updateArchProgress();
 
+  const moduleSource = parsedModules.length > 0
+    ? `${parsedModules.length} modules from MODULE_MAP.md`
+    : allModules.length ? `${allModules.length} modules detected` : null;
   const summary = [
-    mainBundleId                  ? `bundle ID`                            : null,
-    allModules.length             ? `${allModules.length} modules`         : null,
-    schemeNames.length            ? `${schemeNames.length} schemes`        :
-    buildConfigs.length           ? `${buildConfigs.length} configs`       : null,
+    mainBundleId    ? `bundle ID`    : null,
+    moduleSource,
+    schemeNames.length  ? `${schemeNames.length} schemes`  :
+    buildConfigs.length ? `${buildConfigs.length} configs` : null,
     state.detectedInterceptors.length ? `${state.detectedInterceptors.length} interceptors` : null,
   ].filter(Boolean).join(', ');
   showToast(`Auto-filled · ${summary || 'basic settings'} · review & adjust`, 'success');
@@ -1955,7 +2065,8 @@ function generateModulesMD() {
 
   return `# Module Map
 # ─────────────────────────────────────────────────────────────────────────────
-# AI-GENERATED ARTIFACT. Re-run setup wizard to update — do not edit manually.
+# HUMAN-AUTHORED after initial wizard generation. Edit directly to update modules.
+# Agent reads this file but never modifies it.
 # ─────────────────────────────────────────────────────────────────────────────
 
 > Agent: before reading any source file, match the task keywords against the
@@ -2312,13 +2423,11 @@ function buildDataModelScreen(fp) {
   <div class="step-screen" id="screen-datamodel">
     <div class="form-section">
       <h3>Domain Entities</h3>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">
+        Core business objects. API contracts belong in each module's <code>context/</code> file — not here.
+      </div>
       <div class="dynamic-list" id="entities-list"></div>
       <button class="add-btn" onclick="addEntityRow()" style="margin-top:8px">+ Add Entity</button>
-    </div>
-    <div class="form-section">
-      <h3>API Endpoints</h3>
-      <div class="dynamic-list" id="endpoints-list"></div>
-      <button class="add-btn" onclick="addEndpointRow()" style="margin-top:8px">+ Add Endpoint</button>
     </div>
     <div class="btn-actions">
       <button class="btn btn-secondary" onclick="showPreview(generateDataModelMD()); document.getElementById('previewPanel').classList.remove('collapsed')">👁 Preview MD</button>
@@ -2327,7 +2436,6 @@ function buildDataModelScreen(fp) {
     </div>
   </div>`;
   addEntityRow({ name: 'User', fields: 'id: String, email: String, displayName: String, createdAt: Date' });
-  addEndpointRow({ method: 'POST', path: '/auth/login', reqBody: '{"email":"string","password":"string"}', respBody: '{"access_token":"string","user":{"id":"string","email":"string"}}', errors: '401 invalid credentials, 422 validation error' });
 }
 
 let entityCounter = 0;
@@ -2401,28 +2509,16 @@ ${fieldTable}
 `;
   }).join('\n');
 
-  const endpoints = Array.from(document.querySelectorAll('[id^="endpoint-row-"]')).map(row => {
-    const method = row.querySelector('.ep-method')?.value || 'GET';
-    const path   = row.querySelector('.ep-path')?.value.trim() || '/[path]';
-    const req    = row.querySelector('.ep-req')?.value.trim();
-    const resp   = row.querySelector('.ep-resp')?.value.trim();
-    const errors = row.querySelector('.ep-errors')?.value.trim();
-    const reqBlock  = req    ? `Request:\n\`\`\`json\n${req}\n\`\`\`\n` : '';
-    const respBlock = resp   ? `Response 200:\n\`\`\`json\n${resp}\n\`\`\`\n` : '';
-    const errBlock  = errors
-      ? `| Error code | Meaning |\n|------------|---------|${errors.split(',').map(e => {
-          const parts = e.split('—'); return `\n| \`${parts[0].trim()}\` | ${(parts[1]||'').trim() || '[see docs]'} |`;
-        }).join('')}\n` : '';
-    return `#### ${method} ${path}\n\n${reqBlock}${respBlock}${errBlock}`;
-  }).join('\n---\n\n');
-
   return `# Data Model
 # ─────────────────────────────────────────────────────────────────────────────
-# AI-GENERATED ARTIFACT. Re-run setup wizard to update — do not edit manually.
+# HUMAN-AUTHORED after initial wizard generation. Edit directly to add domain entities.
+# API contracts belong in each module's context/ file, not here.
+# Agent reads this file but never modifies it.
 # ─────────────────────────────────────────────────────────────────────────────
 
-> Agent: load this file for any task involving network calls, data models, or API endpoints.
-> The mapping rules are non-negotiable — never expose DTOs or DB entities to the View layer.
+> Agent: load this file for tasks involving domain models, DB schema, or layer mapping rules.
+> API contracts (request/response shapes) live in context/<module>.md — not here.
+> The mapping rules below are non-negotiable — never expose DTOs or DB entities to the View layer.
 
 ---
 
@@ -2476,11 +2572,9 @@ ${entities || '_No entities added yet._'}
 
 ## API Contracts
 
-> Base URLs and auth live in \`ARCHITECTURE.md\` under Networking.
-
-### Endpoints
-
-${endpoints || '_No endpoints added yet._'}
+> API contracts (request/response shapes, error codes, base URLs) live in each module's
+> \`context/<module>.md\` under "What the Agent Should Know".
+> Add them there so the agent loads only the contracts relevant to the task at hand.
 `;
 }
 

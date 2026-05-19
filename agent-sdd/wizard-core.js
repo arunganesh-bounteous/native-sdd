@@ -580,6 +580,24 @@ function updatePreview(stepId) {
 async function saveStep(stepId) {
   const step = STEPS.find(s => s.id === stepId);
   if (!step || !step.file) return;
+
+  // Warn before overwriting files that are manually maintained after first generation
+  const protectedSteps = { modules: 'MODULE_MAP.md', datamodel: 'DATA_MODEL.md' };
+  if (protectedSteps[stepId] && state.dirHandle) {
+    const filename = protectedSteps[stepId];
+    const exists   = await tryReadFile(state.dirHandle, 'agent-sdd', 'spec-kit', filename)
+                  ?? await tryReadFile(state.dirHandle, 'spec-kit', filename);
+    if (exists) {
+      const go = confirm(
+        `⚠️  Overwrite ${filename}?\n\n` +
+        `This file may contain manually added content (purposes, key classes, API contracts).\n\n` +
+        `Saving will regenerate it from the wizard form only — anything added directly in the file will be lost.\n\n` +
+        `Click OK to overwrite, or Cancel to keep the existing file.`
+      );
+      if (!go) return;
+    }
+  }
+
   const content = PLATFORM.generate[stepId]?.() ?? '';
   await handleSave(stepId, step.file, content);
 

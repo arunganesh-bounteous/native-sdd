@@ -73,50 +73,11 @@ data class [DomainModel](
 
 ## API Contracts
 
+> API contracts (request/response shapes, field-level notes, gotchas) belong in each
+> module's `context/<module>.md` file under an **API Contracts** section, not here.
+>
+> Reasons: contracts change every sprint while domain models rarely do; the agent loads
+> only the context files relevant to the current task, so keeping contracts there avoids
+> paying the token cost for unrelated endpoints.
+>
 > Base URLs and auth mechanism live in `ARCHITECTURE.md` under Networking.
-> Document only the request/response data shapes here.
-
----
-
-<!-- Add one section per API endpoint using the format below. -->
-<!-- Format: METHOD /path → Request body → Response 200 → Field table with notes -->
-
-### [Feature] Endpoints
-
-<!-- Replace with your actual endpoint group name -->
-
----
-
-#### POST /[resource]/[action]
-
-**Used by:** `[ServiceClass].[methodName]()` → `[RepositoryClass].[methodName]()`
-
-Request:
-```json
-{
-  "field_one": "string",
-  "field_two": true
-}
-```
-
-Response 200:
-```json
-{
-  "success": true,
-  "data": {
-    "field_one": "string",
-    "field_two": true
-  }
-}
-```
-
-| Field | Kotlin property | Notes |
-|-------|----------------|-------|
-| `data.field_one` | `[ApiResponse].data.fieldOne` | [note — e.g., "authoritative source — use this, not [OtherApi]"] |
-| `data.field_two` | `[ApiResponse].data.fieldTwo` | [note] |
-
-Mapped in: `[module]/src/.../network/responses/[ApiResponse].kt`
-
-> **Agent note:** [any field that must be added or has a known gotcha]
-
----
