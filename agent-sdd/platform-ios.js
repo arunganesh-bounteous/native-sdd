@@ -197,123 +197,211 @@ async function analyzeProject() {
   if (!state.dirHandle) return;
   showToast('Analyzing project…', 'info');
 
-  const [packageSwift, podfile, appPlist] = await Promise.all([
-    tryReadFile(state.dirHandle, 'Package.swift'),
-    tryReadFile(state.dirHandle, 'Podfile'),
-    tryReadFile(state.dirHandle, 'Info.plist'),
-  ]);
-
-  // Find .xcodeproj to determine app name
-  let xcodeTarget = '';
+  // ── Step 1: Find .xcodeproj directory ────────────────────
+  let xcodeTarget = '', xcodeprojDirName = '';
   try {
-    for await (const [name] of state.dirHandle) {
-      if (name.endsWith('.xcodeproj') || name.endsWith('.xcworkspace')) {
-        xcodeTarget = name.replace(/\.(xcodeproj|xcworkspace)$/, '');
+    for await (const [name, handle] of state.dirHandle) {
+      if (handle.kind === 'directory' && name.endsWith('.xcodeproj')) {
+        xcodeTarget = name.replace('.xcodeproj', '');
+        xcodeprojDirName = name;
         break;
       }
     }
   } catch {}
 
-  const src = ((packageSwift || '') + '\n' + (podfile || '')).toLowerCase();
-  const has = (...terms) => terms.some(t => src.includes(t.toLowerCase()));
+  // ── Step 2: Read key project files in parallel ───────────
+  const [packageSwift, podfile, pbxproj] = await Promise.all([
+    tryReadFile(state.dirHandle, 'Package.swift'),
+    tryReadFile(state.dirHandle, 'Podfile'),
+    xcodeprojDirName
+      ? tryReadFile(state.dirHandle, xcodeprojDirName, 'project.pbxproj')
+      : Promise.resolve(null),
+  ]);
 
-  // Count Swift / ObjC source files (wizard-core's countSourceFiles only counts .kt/.java)
-  const fileCounts = { swift: 0, m: 0 };
-  const _skipDirs = new Set(['.build', '.git', 'node_modules', 'DerivedData', 'Pods', 'build', '.swiftpm']);
-  async function _walkIos(dh, depth) {
+  // ── Step 3: Scan Swift source files for imports + patterns ─
+  const swiftImports = new Set();
+  const swiftPatterns = [];
+  let swiftCount = 0, objcCount = 0;
+  const _skipScan = new Set(['.build', '.git', 'node_modules', 'DerivedData', 'Pods', 'build', '.swiftpm']);
+  async function _walkForImports(dh, depth) {
     if (depth <= 0) return;
     try {
-      for await (const [fname, fhandle] of dh) {
-        if (fhandle.kind === 'file') {
-          if (fname.endsWith('.swift')) fileCounts.swift++;
-          else if (fname.endsWith('.m') || fname.endsWith('.mm')) fileCounts.m++;
-        } else if (fhandle.kind === 'directory' && !_skipDirs.has(fname)) {
-          await _walkIos(fhandle, depth - 1);
+      for await (const [fname, fh] of dh) {
+        if (fh.kind === 'file') {
+          if (fname.endsWith('.swift') && swiftCount < 40) {
+            swiftCount++;
+            try {
+              const text = await (await fh.getFile()).text();
+              [...text.matchAll(/^import\s+(\w+)/gm)].forEach(m => swiftImports.add(m[1]));
+              if (text.includes('@StateObject') || text.includes('@ObservedObject')) swiftPatterns.push('stateobject');
+              if (text.includes('@Observable'))                                       swiftPatterns.push('observable');
+              if (text.includes('ObservableObject'))                                  swiftPatterns.push('observableobject');
+              if (text.includes('UIViewController') || text.includes(': UIView'))     swiftPatterns.push('uikit');
+              if (text.includes(': View') || text.includes('some View'))              swiftPatterns.push('swiftui');
+              if (text.includes('async ') || text.includes('await '))                 swiftPatterns.push('asyncawait');
+              if (text.includes('AnyPublisher') || text.includes('@Published'))       swiftPatterns.push('combine');
+              if (text.includes('NavigationStack'))                                    swiftPatterns.push('navstack');
+              if (text.includes('Coordinator'))                                        swiftPatterns.push('coordinator');
+            } catch {}
+          } else if (fname.endsWith('.m') || fname.endsWith('.mm')) {
+            objcCount++;
+          }
+        } else if (fh.kind === 'directory' && !_skipScan.has(fname) && !fname.startsWith('.')) {
+          await _walkForImports(fh, depth - 1);
         }
       }
     } catch {}
   }
-  await _walkIos(state.dirHandle, 6);
-  const lang = fileCounts.swift > 0 ? (fileCounts.m > 0 ? 'Swift+ObjC' : 'Swift') : 'Objective-C';
+  await _walkForImports(state.dirHandle, 5);
 
-  // DI detection
-  const di = has('resolver', 'swinject')           ? (has('resolver') ? 'Resolver' : 'Swinject')
-           : has('needle')                          ? 'Needle'
-           : has('factory', 'swiftinject')          ? 'Factory'
-           :                                          'Manual';
+  const lang   = swiftCount > 0 ? (objcCount > 0 ? 'Swift+ObjC' : 'Swift') : 'Objective-C';
+  const hasImp = lib  => swiftImports.has(lib);
+  const hasPat = pat  => swiftPatterns.includes(pat);
+  const src    = ((packageSwift || '') + '\n' + (podfile || '')).toLowerCase();
+  const hasSrc = (...terms) => terms.some(t => src.includes(t.toLowerCase()));
 
-  // Async/State detection
-  const hasAsyncAwait = has('async', '@asynchandler') || true; // default for modern Swift
-  const hasCombine    = has('combine', 'published', 'currentvaluesubject', 'passthroughsubject');
-  const hasRxSwift    = has('rxswift', 'rxcocoa', 'rxrelay');
-  const hasObservable = has('@observable'); // Swift 5.9+
+  // ── Step 4: Parse project.pbxproj for bundle ID + configs ─
+  let mainBundleId = '';
+  let buildConfigs = [];
+  if (pbxproj) {
+    const allIds = [...pbxproj.matchAll(/PRODUCT_BUNDLE_IDENTIFIER\s*=\s*([^\s;]+)\s*;/g)]
+      .map(m => m[1].trim())
+      .filter(id => id.includes('.') &&
+        !/(test|widget|extension|watch|notification|clip)/i.test(id));
+    mainBundleId = allIds[0] || '';
 
-  // UI detection
-  const hasSwiftUI = has('swiftui', 'view', 'some view') || true;
-  const hasUIKit   = has('uikit', 'uiviewcontroller', 'uistoryboard');
-  const uiMode     = hasSwiftUI && hasUIKit ? 'Mixed' : hasUIKit ? 'UIKit' : 'SwiftUI';
+    // XCBuildConfiguration names (Debug, Release, Staging, etc.)
+    const cfgMatches = [...pbxproj.matchAll(/isa\s*=\s*XCBuildConfiguration[\s\S]*?name\s*=\s*([A-Za-z][A-Za-z0-9\-_ ]+?)\s*;/g)];
+    buildConfigs = [...new Set(cfgMatches.map(m => m[1].trim()))].filter(n => n.length < 30);
+  }
 
-  // Navigation detection
-  const navMode = has('navigationstack')  ? 'NavigationStack'
-                : has('coordinator')      ? 'Coordinator'
-                : has('uinavigationcontroller', 'pushviewcontroller') ? 'UINavigationController'
-                :                           '';
+  // ── Step 5: Read xcscheme names ──────────────────────────
+  let schemeNames = [];
+  if (xcodeprojDirName) {
+    try {
+      const xcodeprojH = await state.dirHandle.getDirectoryHandle(xcodeprojDirName);
+      const sharedH    = await xcodeprojH.getDirectoryHandle('xcshareddata');
+      const schemesH   = await sharedH.getDirectoryHandle('xcschemes');
+      for await (const [name] of schemesH)
+        if (name.endsWith('.xcscheme')) schemeNames.push(name.replace('.xcscheme', ''));
+    } catch {}
+  }
 
-  // Networking
-  const netLib = has('alamofire') ? 'Alamofire'
-               : has('moya')     ? 'Moya'
-               :                   'URLSession';
+  // ── Step 6: Detect dependencies ─────────────────────────
+  const di = hasImp('Resolver')         ? 'Resolver'
+           : hasImp('Swinject')         ? 'Swinject'
+           : hasImp('NeedleFoundation') ? 'Needle'
+           : hasImp('Factory')          ? 'Factory'
+           : hasSrc('resolver')         ? 'Resolver'
+           : hasSrc('swinject')         ? 'Swinject'
+           : hasSrc('needle')           ? 'Needle'
+           : hasSrc('factory')          ? 'Factory'
+           :                             'Manual';
 
-  // Storage
-  const hasSwiftData = has('swiftdata', '@model');
-  const hasCoreData  = has('coredata', 'nsmanagedobject', 'nspersistentcontainer');
-  const hasRealm     = has('realmswift', 'realm');
-  const hasDefaults  = has('userdefaults');
+  const hasAsyncAwait = hasPat('asyncawait') || hasSrc('async/await');
+  const hasCombine    = hasPat('combine')    || hasImp('Combine')    || hasSrc('combine', 'currentvaluesubject');
+  const hasRxSwift    = hasImp('RxSwift')    || hasSrc('rxswift', 'rxcocoa');
+  const hasObservable = hasPat('observable') && !hasPat('observableobject');
+  const hasObsObj     = hasPat('observableobject') || hasPat('stateobject');
 
-  // Image loading
-  const imgLib = has('kingfisher') ? 'Kingfisher'
-               : has('sdwebimage') ? 'SDWebImage'
-               : has('nuke')       ? 'Nuke'
-               :                    '';
+  const hasSwiftUI = hasPat('swiftui') || hasImp('SwiftUI');
+  const hasUIKit   = hasPat('uikit')   || hasImp('UIKit') || hasSrc('uiviewcontroller');
+  const uiMode     = hasSwiftUI && hasUIKit ? 'Mixed' : hasUIKit ? 'UIKit' : hasSwiftUI ? 'SwiftUI' : 'SwiftUI';
 
-  // SPM modules from Package.swift
-  const moduleNames = packageSwift
+  const navMode = hasPat('navstack') || hasSrc('navigationstack')         ? 'NavigationStack'
+                : hasPat('coordinator') || hasSrc('coordinator')          ? 'Coordinator'
+                : hasSrc('uinavigationcontroller', 'pushviewcontroller')  ? 'UINavigationController'
+                :                                                            '';
+
+  const netLib = hasImp('Alamofire') || hasSrc('alamofire') ? 'Alamofire'
+               : hasImp('Moya')      || hasSrc('moya')      ? 'Moya'
+               :                                               'URLSession';
+
+  const hasSwiftData = hasImp('SwiftData')  || hasSrc('swiftdata', '@model');
+  const hasCoreData  = hasImp('CoreData')   || hasSrc('coredata', 'nsmanagedobject');
+  const hasRealm     = hasImp('RealmSwift') || hasSrc('realmswift', 'realm');
+  const hasDefaults  = hasSrc('userdefaults');
+
+  const imgLib = hasImp('Kingfisher') || hasSrc('kingfisher') ? 'Kingfisher'
+               : hasImp('SDWebImage') || hasSrc('sdwebimage') ? 'SDWebImage'
+               : hasImp('Nuke')       || hasSrc('nuke')       ? 'Nuke'
+               :                                                 '';
+
+  // ── Step 7: Build module list ─────────────────────────────
+  const spmModules = packageSwift
     ? [...packageSwift.matchAll(/\.target\s*\(\s*name:\s*["']([^"']+)["']/g)].map(m => m[1])
     : [];
-
-  // Podfile targets
   const podTargets = podfile
-    ? [...podfile.matchAll(/target\s+['"]([^'"]+)['"]\s+do/g)].map(m => m[1]).filter(t => !t.includes('Test'))
+    ? [...podfile.matchAll(/target\s+['"]([^'"]+)['"]\s+do/g)].map(m => m[1]).filter(t => !/[Tt]est/.test(t))
     : [];
 
-  const allModules = [...new Set([...moduleNames, ...podTargets, xcodeTarget].filter(Boolean))];
+  // Scan root directory for feature folders containing Swift source
+  const sourceModules = [];
+  const _skipModDirs = new Set(['.build', '.git', 'node_modules', 'DerivedData', 'Pods',
+    'build', '.swiftpm', 'fastlane', 'scripts', 'docs', 'Resources',
+    xcodeprojDirName, xcodeTarget + '.xcworkspace']);
+  try {
+    for await (const [name, handle] of state.dirHandle) {
+      if (handle.kind !== 'directory' || _skipModDirs.has(name) || name.startsWith('.')) continue;
+      let hasSrcFiles = false;
+      try {
+        for await (const [fname, fh] of handle) {
+          if (fname.endsWith('.swift') || fname === 'Sources' || fname === 'Source') {
+            hasSrcFiles = true; break;
+          }
+        }
+      } catch {}
+      if (hasSrcFiles && name !== xcodeTarget) sourceModules.push(name);
+    }
+  } catch {}
 
-  // ── Apply to Project Config ──────────────────────────
-  if (xcodeTarget) {
-    const el = document.getElementById('cfg-bundle-id');
-    if (el && !el.value) el.value = `com.example.${xcodeTarget.toLowerCase()}`;
-  }
+  const allModules = [...new Set([...spmModules, ...podTargets, xcodeTarget, ...sourceModules].filter(Boolean))];
+
+  // ── Step 8: Apply to Project Config ──────────────────────
+  const bundleEl = document.getElementById('cfg-bundle-id');
+  if (bundleEl) bundleEl.value = mainBundleId || (xcodeTarget ? `com.example.${xcodeTarget.toLowerCase()}` : '');
   selectPill('cfg-platform', 'iOS', 'radio');
-  if (lang === 'Swift') selectPill('cfg-lang', 'Swift', 'radio');
+  if (lang === 'Swift')            selectPill('cfg-lang', 'Swift', 'radio');
   else if (lang === 'Objective-C') selectPill('cfg-lang', 'Objective-C', 'radio');
-  else selectPill('cfg-lang', 'Swift+ObjC', 'radio');
+  else                             selectPill('cfg-lang', 'Swift+ObjC', 'radio');
   updatePreview('projectconfig');
 
-  // ── Apply to Architecture pills ──────────────────────
-  if (lang === 'Swift') selectPill('lang', 'Swift');
+  // ── Step 9: Populate scheme rows ─────────────────────────
+  const schemeList = document.getElementById('cfg-schemes-list');
+  if (schemeList) { schemeList.innerHTML = ''; schemeCounter = 0; }
+
+  const schemeSrc = schemeNames.length > 0 ? schemeNames : buildConfigs;
+  if (schemeSrc.length > 0) {
+    schemeSrc.forEach(name => {
+      const nl   = name.toLowerCase();
+      const sfx  = nl.includes('debug') || nl === 'debug'     ? '.debug'
+                 : nl.includes('stag')  || nl.includes('uat') ? '.staging'
+                 :                                               '';
+      addSchemeRow({
+        name,
+        bundleId: mainBundleId ? mainBundleId + sfx : '',
+        note: nl.includes('debug') ? 'Development build' : nl.includes('stag') || nl.includes('uat') ? 'Staging build' : nl.includes('release') || nl.includes('prod') ? 'Production build' : '',
+      });
+    });
+  } else {
+    addSchemeRow({ name: 'Debug',   bundleId: mainBundleId ? mainBundleId + '.debug'   : '', note: 'Development build' });
+    addSchemeRow({ name: 'Staging', bundleId: mainBundleId ? mainBundleId + '.staging' : '', note: 'Staging build' });
+  }
+
+  // ── Step 10: Apply Architecture pills ────────────────────
+  if (lang === 'Swift')        selectPill('lang', 'Swift');
   else if (lang === 'Swift+ObjC') selectPill('lang', 'Swift+ObjC');
 
   selectPill('arch', 'MVVM', 'radio');
-  if (di !== 'Manual') selectPill('di', di, 'radio');
-  else selectPill('di', 'Manual', 'radio');
+  selectPill('di', di, 'radio');
 
-  selectPill('async', 'async/await');
+  if (hasAsyncAwait) selectPill('async', 'async/await');
   if (hasCombine)    selectPill('async', 'Combine');
   if (hasRxSwift)    selectPill('async', 'RxSwift');
 
-  if (hasObservable) selectPill('state', '@Observable');
-  else               selectPill('state', 'ObservableObject');
-  if (hasRxSwift)    selectPill('state', 'RxRelay');
+  if (hasObservable)      selectPill('state', '@Observable');
+  else if (hasObsObj)     selectPill('state', 'ObservableObject');
+  if (hasRxSwift)         selectPill('state', 'RxRelay');
 
   selectPill('ui', uiMode, 'radio');
   if (navMode) selectPill('nav', navMode, 'radio');
@@ -325,42 +413,35 @@ async function analyzeProject() {
   if (hasDefaults)  selectPill('storage', 'UserDefaults');
   if (imgLib)       selectPill('img', imgLib, 'radio');
 
-  // ── Apply to Testing dropdowns ───────────────────────
-  setSelectOption('test-test-runner',   'XCTest');
-  setSelectOption('test-mocking',       has('mockingbird') ? 'Mockingbird' : 'Manual Mocks');
-  setSelectOption('test-flow-test',     has('combine') ? 'XCTestExpectation' : 'None');
-  setSelectOption('test-assertions',    has('quick', 'nimble') ? 'Nimble' : 'XCTAssert');
-  setSelectOption('test-ui-test',       has('xcuiapplication', 'xcuitest') ? 'XCUITest' : 'None');
+  // ── Step 11: Testing dropdowns ───────────────────────────
+  setSelectOption('test-test-runner', 'XCTest');
+  setSelectOption('test-mocking',     hasImp('Mockingbird') || hasSrc('mockingbird') ? 'Mockingbird' : 'Manual Mocks');
+  setSelectOption('test-flow-test',   hasCombine ? 'XCTestExpectation' : 'None');
+  setSelectOption('test-assertions',  hasImp('Nimble') || hasSrc('quick', 'nimble') ? 'Nimble' : 'XCTAssert');
+  setSelectOption('test-ui-test',     hasSrc('xcuiapplication', 'xcuitest') ? 'XCUITest' : 'None');
 
-  // ── Apply to Migration toggles ────────────────────────
+  // ── Step 12: Migration toggles ────────────────────────────
   const setToggle = (id, val) => { const el = document.getElementById('mig-' + id); if (el) el.checked = val; };
   if (lang === 'Swift+ObjC' || lang === 'Objective-C') setToggle('objc', true);
-  if (hasCombine)  setToggle('combine', true);
-  if (hasRxSwift)  setToggle('rxswift', true);
-  if (hasUIKit && hasSwiftUI) setToggle('uikit', true);
+  if (hasCombine)              setToggle('combine', true);
+  if (hasRxSwift)              setToggle('rxswift', true);
+  if (hasUIKit && hasSwiftUI)  setToggle('uikit', true);
 
-  // ── Apply to Modules list ─────────────────────────────
+  // ── Step 13: Modules list ─────────────────────────────────
   if (allModules.length > 0) {
     const list = document.getElementById('modules-list');
-    if (list) {
-      list.innerHTML = '';
-      moduleCounter = 0;
-      allModules.forEach(name => addModuleRow({
-        name,
-        path: name + '/',
-        keywords: guessModuleKeywords(name),
-      }));
-    }
+    if (list) { list.innerHTML = ''; moduleCounter = 0; }
+    allModules.forEach(name => addModuleRow({ name, path: name + '/', keywords: guessModuleKeywords(name) }));
   }
 
-  state.detectedInterceptors   = await scanForURLProtocols(state.dirHandle);
-  state.detectedModuleDetails  = allModules.map(name => {
+  state.detectedInterceptors  = await scanForURLProtocols(state.dirHandle);
+  state.detectedModuleDetails = allModules.map(name => {
     const n = name.toLowerCase();
     let type = '—', notes = '';
-    if (n.includes('feature') || n.includes('view'))     { type = 'MVVM'; notes = 'Feature module'; }
-    else if (n.includes('core') || n.includes('common')) { type = 'Repository'; notes = 'Shared domain layer'; }
-    else if (n.includes('network') || n.includes('api')) { type = '—'; notes = 'Network layer'; }
-    else if (n.includes('kit') || n.includes('util'))    { type = '—'; notes = 'Shared utilities'; }
+    if      (n.match(/feature|view|screen/))     { type = 'MVVM';       notes = 'Feature module'; }
+    else if (n.match(/core|common|shared/))      { type = 'Repository'; notes = 'Shared domain layer'; }
+    else if (n.match(/network|api|service/))     { type = '—';          notes = 'Network layer'; }
+    else if (n.match(/kit|util|helper|support/)) { type = '—';          notes = 'Shared utilities'; }
     return { name, type, diCol: di !== 'Manual' ? di : '—', notes };
   });
 
@@ -371,7 +452,14 @@ async function analyzeProject() {
   renderApproachRows('state');
   updateArchProgress();
 
-  showToast(`Auto-filled from project · ${allModules.length} modules, ${state.detectedInterceptors.length} interceptors detected · review & adjust`, 'success');
+  const summary = [
+    mainBundleId                  ? `bundle ID`                            : null,
+    allModules.length             ? `${allModules.length} modules`         : null,
+    schemeNames.length            ? `${schemeNames.length} schemes`        :
+    buildConfigs.length           ? `${buildConfigs.length} configs`       : null,
+    state.detectedInterceptors.length ? `${state.detectedInterceptors.length} interceptors` : null,
+  ].filter(Boolean).join(', ');
+  showToast(`Auto-filled · ${summary || 'basic settings'} · review & adjust`, 'success');
 }
 
 function setSelectOption(id, value) {
