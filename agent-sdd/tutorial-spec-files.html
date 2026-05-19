@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MODULE_MAP & DATA_MODEL — Spec File Guide</title>
+<style>
+  :root {
+    --bg:         #0b111c;
+    --surface:    #0f1825;
+    --surface2:   #162033;
+    --border:     #1e2e47;
+    --accent:     #38bdf8;
+    --accent-dim: rgba(56,189,248,0.15);
+    --accent2:    #818cf8;
+    --green:      #3fb950;
+    --green-dim:  #0d2b17;
+    --yellow:     #d29922;
+    --yellow-dim: #2b2005;
+    --red:        #f85149;
+    --red-dim:    #2b0d0d;
+    --purple:     #bc8cff;
+    --purple-dim: #1e1040;
+    --text:       #e8eaf2;
+    --text-muted: #9ba3be;
+    --text-dim:   #647090;
+    --mono:       'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --sans:       -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --radius:     8px;
+    --nav-w:      260px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.7;
+    display: flex;
+  }
+
+  /* ── Sidebar ── */
+  nav {
+    width: var(--nav-w);
+    height: 100vh;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    position: fixed;
+    top: 0; left: 0;
+    overflow-y: auto;
+    padding: 24px 0 40px;
+    z-index: 100;
+  }
+
+  .nav-logo {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .nav-logo .badge {
+    background: var(--yellow-dim);
+    color: var(--yellow);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    display: inline-block;
+    margin-bottom: 8px;
+  }
+  .nav-logo h1 { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.4; }
+
+  .nav-section {
+    font-size: 10px; font-weight: 700; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.8px;
+    padding: 12px 20px 4px;
+  }
+
+  nav a {
+    display: block; padding: 6px 20px;
+    color: var(--text-muted); text-decoration: none;
+    font-size: 13px; border-left: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  nav a:hover { color: var(--text); background: var(--surface2); }
+  nav a.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-dim); }
+  nav a.sub { padding-left: 32px; font-size: 12px; }
+
+  /* ── Main ── */
+  main { margin-left: var(--nav-w); max-width: 880px; padding: 60px 52px; width: 100%; }
+  section { margin-bottom: 80px; }
+
+  h2 { font-size: 26px; font-weight: 700; color: var(--text); margin-bottom: 6px; padding-top: 8px; }
+  h2 .section-num { color: var(--accent); font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px; font-family: var(--mono); }
+  h3 { font-size: 17px; font-weight: 600; color: var(--text); margin: 32px 0 12px; }
+  h4 { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin: 24px 0 10px; }
+
+  p { margin-bottom: 14px; color: var(--text-muted); }
+  p strong { color: var(--text); }
+  .lead { font-size: 17px; color: var(--text-muted); line-height: 1.8; margin-bottom: 28px; }
+
+  /* ── Hero ── */
+  .hero {
+    background: linear-gradient(135deg, var(--yellow-dim) 0%, var(--accent-dim) 100%);
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 40px; margin-bottom: 60px; position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content: ''; position: absolute; top: -40px; right: -40px;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(210,153,34,0.12) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .hero .tag { font-size: 11px; font-weight: 700; color: var(--yellow); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .hero h1 { font-size: 30px; font-weight: 800; color: var(--text); line-height: 1.2; margin-bottom: 16px; }
+  .hero p { font-size: 16px; color: var(--text-muted); max-width: 560px; margin-bottom: 0; }
+
+  /* ── Callouts ── */
+  .callout { border-radius: var(--radius); padding: 16px 20px; margin: 20px 0; font-size: 14px; border-left: 3px solid; }
+  .callout-blue  { background: var(--accent-dim);  border-color: var(--accent);  color: #e0f2fe; }
+  .callout-green  { background: var(--green-dim);   border-color: var(--green);   color: #a3e8b0; }
+  .callout-yellow { background: var(--yellow-dim);  border-color: var(--yellow);  color: #f0d080; }
+  .callout-red    { background: var(--red-dim);     border-color: var(--red);     color: #ffa8a3; }
+  .callout strong { color: inherit; }
+
+  /* ── Tables ── */
+  table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 13.5px; }
+  th { text-align: left; padding: 10px 14px; background: var(--surface2); color: var(--text-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text-muted); vertical-align: top; }
+  td strong { color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+
+  /* ── Code ── */
+  pre { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; overflow-x: auto; margin: 16px 0 24px; font-family: var(--mono); font-size: 13px; line-height: 1.6; }
+  code { font-family: var(--mono); font-size: 12.5px; background: var(--surface2); padding: 2px 6px; border-radius: 4px; color: var(--accent); border: 1px solid var(--border); }
+  pre code { background: none; padding: 0; border: none; color: var(--text-muted); font-size: 13px; }
+  .kw  { color: #ff7b72; }
+  .fn  { color: #d2a8ff; }
+  .str { color: #a5d6ff; }
+  .cm  { color: #6e7681; font-style: italic; }
+  .ok  { color: var(--green); }
+  .bad { color: var(--red); }
+  .hl  { color: var(--text); }
+  .yn  { color: var(--yellow); }
+
+  /* ── Decision cards ── */
+  .decision {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px 24px; margin: 16px 0;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .decision-q { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .decision-a { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+  .decision-badge {
+    font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 20px;
+    text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; margin-top: 2px;
+  }
+  .badge-yes  { background: var(--green-dim);  color: var(--green); }
+  .badge-no   { background: var(--red-dim);    color: var(--red); }
+  .badge-maybe{ background: var(--yellow-dim); color: var(--yellow); }
+
+  /* ── Field breakdown ── */
+  .field-grid { display: flex; flex-direction: column; gap: 2px; margin: 16px 0; }
+  .field-row {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 12px 16px;
+    display: grid; grid-template-columns: 160px 1fr auto;
+    gap: 12px; align-items: start;
+  }
+  .field-name { font-family: var(--mono); font-size: 12px; color: var(--yellow); font-weight: 600; }
+  .field-desc { font-size: 13px; color: var(--text-muted); line-height: 1.4; }
+  .field-tag  { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; }
+  .tag-required { background: var(--red-dim);    color: var(--red); }
+  .tag-optional { background: var(--surface2);   color: var(--text-dim); border: 1px solid var(--border); }
+  .tag-critical { background: var(--yellow-dim); color: var(--yellow); }
+
+  /* ── Before/after ── */
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
+  .compare-col { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .compare-col.bad-col  { border-top: 3px solid var(--red); }
+  .compare-col.good-col { border-top: 3px solid var(--green); }
+  .compare-col h4 { margin-top: 0; font-size: 12px; }
+  .compare-col.bad-col  h4 { color: var(--red); }
+  .compare-col.good-col h4 { color: var(--green); }
+  .compare-col ul { padding-left: 18px; }
+  .compare-col li { font-size: 13px; color: var(--text-muted); margin-bottom: 6px; line-height: 1.5; }
+
+  /* ── Timeline / frequency ── */
+  .freq-row {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 14px 0; border-bottom: 1px solid var(--border);
+  }
+  .freq-row:last-child { border-bottom: none; }
+  .freq-pill {
+    font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 20px;
+    text-transform: uppercase; letter-spacing: 0.4px; flex-shrink: 0; margin-top: 2px;
+  }
+  .freq-always { background: var(--green-dim);  color: var(--green); }
+  .freq-often  { background: var(--accent-dim); color: var(--accent); }
+  .freq-rare   { background: var(--surface2);   color: var(--text-dim); border: 1px solid var(--border); }
+  .freq-title  { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+  .freq-desc   { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+
+  /* ── Checklist ── */
+  .checklist { list-style: none; padding: 0; margin: 12px 0; }
+  .checklist li { padding: 8px 0; font-size: 13.5px; color: var(--text-muted); display: flex; align-items: flex-start; gap: 10px; border-bottom: 1px solid var(--border); }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist li::before { content: '○'; color: var(--text-dim); flex-shrink: 0; margin-top: 1px; }
+  .checklist li strong { color: var(--text); }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+
+  /* ── Footer ── */
+  .app-footer {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: 28px; display: flex; align-items: center; justify-content: center;
+    background: var(--surface); border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--text-muted); letter-spacing: 0.3px;
+    z-index: 200; user-select: none;
+  }
+  .app-footer .footer-sep { margin: 0 8px; color: var(--border); }
+  .app-footer .footer-brand {
+    font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+    background: linear-gradient(90deg, #38bdf8, #818cf8);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  body { padding-bottom: 28px; }
+
+  @media (max-width: 900px) {
+    nav { display: none; }
+    main { margin-left: 0; padding: 32px 20px; }
+    .compare { grid-template-columns: 1fr; }
+    .field-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav id="sidebar">
+  <div class="nav-logo">
+    <div class="badge">Spec File Guide</div>
+    <h1>MODULE_MAP &<br>DATA_MODEL</h1>
+    <p style="font-size:10px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;margin-top:8px;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Bounteous</p>
+  </div>
+
+  <div class="nav-section">Overview</div>
+  <a href="#what-are-they">What are these files?</a>
+  <a href="#rule">The golden rule</a>
+  <a href="#when-to-update">When to update</a>
+
+  <div class="nav-section">MODULE_MAP.md</div>
+  <a href="#modulemap-purpose">Purpose</a>
+  <a href="#modulemap-fields">Field breakdown</a>
+  <a href="#modulemap-keywords">Writing good keywords</a>
+  <a href="#modulemap-example">Real example</a>
+  <a href="#modulemap-checklist">Per-ticket checklist</a>
+
+  <div class="nav-section">DATA_MODEL.md</div>
+  <a href="#datamodel-purpose">Purpose</a>
+  <a href="#datamodel-sections">What to document</a>
+  <a href="#datamodel-endpoint">Endpoint entry format</a>
+  <a href="#datamodel-example">Real example</a>
+  <a href="#datamodel-checklist">Per-ticket checklist</a>
+
+  <div class="nav-section">Both Files</div>
+  <a href="#lifecycle">File lifecycle</a>
+  <a href="#mistakes">Common mistakes</a>
+
+  <div class="nav-section">More Guides</div>
+  <a href="tutorial.html">📖 Main Tutorial</a>
+  <a href="tutorial-spec-kit.html">📐 Spec-Kit Files Guide</a>
+  <a href="setup-wizard.html">🧙 Setup Wizard</a>
+</nav>
+
+<main>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="tag">Per-ticket spec files</div>
+    <h1>MODULE_MAP.md &<br>DATA_MODEL.md</h1>
+    <p>The two spec-kit files you update most often. This guide explains what to write, when to write it, and what happens if you skip it.</p>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="what-are-they">
+    <h2><span class="section-num">01</span>What are these files?</h2>
+    <p class="lead">They are the agent's navigation system and API contract reference. Without them the agent can still work — but it wastes time scanning the wrong files and risks guessing field names incorrectly.</p>
+
+    <table>
+      <tr><th>File</th><th>Answers the question</th><th>Agent uses it to</th></tr>
+      <tr>
+        <td><strong>MODULE_MAP.md</strong></td>
+        <td>Where does each feature live in the codebase?</td>
+        <td>Match task keywords → load the right <code>context/</code> file → read only the relevant source files</td>
+      </tr>
+      <tr>
+        <td><strong>DATA_MODEL.md</strong></td>
+        <td>What do the API requests and responses look like?</td>
+        <td>Know exact field names, types, and which fields already exist vs need to be added</td>
+      </tr>
+    </table>
+
+    <p>Think of MODULE_MAP as a <strong>directory</strong> and DATA_MODEL as an <strong>API contract reference</strong>. Both are append-only registers that grow with your project.</p>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="rule">
+    <h2><span class="section-num">02</span>The Golden Rule</h2>
+
+    <div class="callout callout-green">
+      <strong>Always append. Never replace.</strong> Both files are registers — they grow over time. Add new entries for new modules and new endpoints. Never remove or overwrite existing entries. Future tasks depend on what you wrote today.
+    </div>
+
+    <div class="compare">
+      <div class="compare-col bad-col">
+        <h4>❌ Wrong — replacing</h4>
+        <ul>
+          <li>Delete old module entries and rewrite for the new ticket</li>
+          <li>Replace the whole endpoints section for a new task</li>
+          <li>Start from scratch each sprint</li>
+        </ul>
+      </div>
+      <div class="compare-col good-col">
+        <h4>✅ Right — appending</h4>
+        <ul>
+          <li>Scroll to the bottom of the module list, add new module entry</li>
+          <li>Scroll to the bottom of API Contracts, add new endpoint section</li>
+          <li>After 10 tickets the file is nearly complete — future tasks need no changes</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="when-to-update">
+    <h2><span class="section-num">03</span>When to Update Each File</h2>
+    <p>Before every ticket, ask two questions. If the answer is yes — add the missing entry. If no — don't touch the file.</p>
+
+    <div style="margin: 20px 0;">
+      <div class="freq-row">
+        <div class="freq-pill freq-always">Every ticket</div>
+        <div>
+          <div class="freq-title">Write the task MD</div>
+          <div class="freq-desc"><code>tasks/[PROJ]-XXXX.md</code> — always required. This is the only file you always create.</div>
+        </div>
+      </div>
+      <div class="freq-row">
+        <div class="freq-pill freq-often">Often — first few tickets</div>
+        <div>
+          <div class="freq-title">Add to MODULE_MAP.md</div>
+          <div class="freq-desc">Only if the task touches a module not yet listed. After your first 10 tickets covering different areas, most new tickets need no MODULE_MAP changes.</div>
+        </div>
+      </div>
+      <div class="freq-row">
+        <div class="freq-pill freq-often">Often — new API work</div>
+        <div>
+          <div class="freq-title">Add to DATA_MODEL.md</div>
+          <div class="freq-desc">Only if the task calls an endpoint not yet documented, or adds/changes a field on an existing request. UI-only tasks rarely need DATA_MODEL changes.</div>
+        </div>
+      </div>
+      <div class="freq-row">
+        <div class="freq-pill freq-rare">Rare</div>
+        <div>
+          <div class="freq-title">Update ARCHITECTURE.md, CONVENTIONS.md, etc.</div>
+          <div class="freq-desc">Only when the architecture or team conventions actually change — not per ticket.</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Decision guide — MODULE_MAP.md</h3>
+    <div class="decision">
+      <div class="decision-badge badge-yes">Add entry</div>
+      <div>
+        <div class="decision-q">The task touches a module/package not yet listed in MODULE_MAP.md</div>
+        <div class="decision-a">Add a new entry at the bottom with accurate keywords. The agent uses keywords to route — vague or missing keywords mean it loads the wrong context file or scans everything.</div>
+      </div>
+    </div>
+    <div class="decision">
+      <div class="decision-badge badge-no">Skip</div>
+      <div>
+        <div class="decision-q">The module is already listed</div>
+        <div class="decision-a">No action needed. The agent will find it and load the correct context file.</div>
+      </div>
+    </div>
+    <div class="decision">
+      <div class="decision-badge badge-maybe">Update keywords</div>
+      <div>
+        <div class="decision-q">The module is listed but your task uses terms not in the Keywords field</div>
+        <div class="decision-a">Add the new terms to the Keywords field of the existing entry. Do not create a duplicate entry.</div>
+      </div>
+    </div>
+
+    <h3>Decision guide — DATA_MODEL.md</h3>
+    <div class="decision">
+      <div class="decision-badge badge-yes">Add endpoint</div>
+      <div>
+        <div class="decision-q">The task calls an API endpoint not yet documented</div>
+        <div class="decision-a">Add a full endpoint section — method, path, request JSON, response JSON, field table with notes. Without this the agent may guess field names incorrectly.</div>
+      </div>
+    </div>
+    <div class="decision">
+      <div class="decision-badge badge-maybe">Add field note</div>
+      <div>
+        <div class="decision-q">The endpoint is documented but the task adds a new field that doesn't exist yet</div>
+        <div class="decision-a">Add a row to the field table for that endpoint with a note like "Must be added — does not exist yet". This tells the agent exactly what to create vs what already exists.</div>
+      </div>
+    </div>
+    <div class="decision">
+      <div class="decision-badge badge-no">Skip</div>
+      <div>
+        <div class="decision-q">The endpoint and all fields are already documented</div>
+        <div class="decision-a">No action needed. The agent reads the existing contract.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="modulemap-purpose">
+    <h2><span class="section-num">04</span>MODULE_MAP.md — Purpose</h2>
+    <p class="lead">The module registry. Once the agent has routed to the right context file (via <code>context/_index.md</code>), it comes here for source paths, key classes, and debt anchors. It never scans the full codebase from scratch. <strong>Android projects</strong> use Gradle module names as entries; <strong>iOS projects</strong> use Swift Package Manager targets or logical Xcode groups.</p>
+
+    <div class="callout callout-blue">
+      <strong>The routing chain:</strong>
+      Task keywords → <code>context/_index.md</code> keyword match → load <code>context/profile.md</code> → read only files listed there → execute task<br><br>
+      <strong>MODULE_MAP.md</strong> is the registry consulted <em>after</em> routing — for source paths, key classes, and debt anchors. Routing lives in <code>context/_index.md</code>.
+    </div>
+
+    <p>If a module has no context file yet, the agent uses the <code>Key classes</code> field in MODULE_MAP.md to find the right source files. That still works — but it's slower and less accurate than having a precise context file.</p>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="modulemap-fields">
+    <h2><span class="section-num">05</span>MODULE_MAP.md — Field Breakdown</h2>
+    <p>Each module entry is a markdown table with 9 fields. Here's what each field does and which ones matter most.</p>
+
+    <div class="field-grid">
+      <div class="field-row">
+        <div class="field-name">Module name</div>
+        <div class="field-desc">Gradle module name or logical grouping name. e.g. <code>:app/profile</code> or <code>:feature-api-sdk</code>. Used as the section header.</div>
+        <div class="field-tag tag-required">Required</div>
+      </div>
+      <div class="field-row">
+        <div class="field-name">Path</div>
+        <div class="field-desc">Relative path from <code>codebase_path</code> in <code>project.config.md</code>. Agent resolves all file reads from this path. <strong>Android:</strong> <code>app/src/main/java/…/feature/</code>. <strong>iOS:</strong> <code>Sources/FeatureName/</code> or <code>MyApp/Features/Auth/</code>.</div>
+        <div class="field-tag tag-required">Required</div>
+      </div>
+      <div class="field-row">
+        <div class="field-name">Keywords</div>
+        <div class="field-desc">Human-reference terms for this module — class names, feature names, ticket terminology. <strong>Kept in sync with <code>context/_index.md</code></strong>, which is the authoritative routing table the agent actually uses. Write keywords here so humans can read and maintain the map; copy them into <code>_index.md</code> so the agent can route.</div>
+        <div class="field-tag tag-critical">Critical</div>
+      </div>
+      <div class="field-row">
+        <div class="field-name">Purpose</div>
+        <div class="field-desc">One sentence — what this module does and what it does NOT do. Boundaries matter — prevents the agent loading this module for unrelated tasks.</div>
+        <div class="field-tag tag-required">Required</div>
+      </div>
+      <div class="field-row">
+        <div class="field-name">Key classes</div>
+        <div class="field-desc">The 3–6 most important files. Agent reads these first when the context file doesn't exist yet.</div>
+        <div class="field-tag tag-required">Required</div>
+      </div>
+      <div class="field-row">
+        <div class="field-name">Context file</div>
+        <div class="field-desc">Path to the <code>context/</code> file for this module. Agent loads this file before reading any source. If the file doesn't exist yet the agent creates it after the task.</div>
+        <div class="field-tag tag-required">Required</div>
+      </div>
+      <div class="field-row">
+        <div class="field-name">Language</div>
+        <div class="field-desc"><strong>Android:</strong> Kotlin / Java / Kotlin+Java. <strong>iOS:</strong> Swift / Swift+ObjC. Tells the agent which MIGRATION_RULES apply and which syntax to use when creating new files.</div>
+        <div class="field-tag tag-optional">Optional</div>
+      </div>
+      <div class="field-row">
+        <div class="field-name">Pattern</div>
+        <div class="field-desc">MVVM, Infrastructure, Repository, Singleton, etc. Helps the agent pick the right patterns for new code.</div>
+        <div class="field-tag tag-optional">Optional</div>
+      </div>
+      <div class="field-row">
+        <div class="field-name">Depends on</div>
+        <div class="field-desc">Which other modules this imports. Helps the agent understand cross-module impact and load additional context files for multi-module tasks.</div>
+        <div class="field-tag tag-optional">Optional</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="modulemap-keywords">
+    <h2><span class="section-num">06</span>Writing Good Keywords</h2>
+    <p>Keywords are the most important field. The agent matches the words in your task description against these keywords. If a word in the task doesn't appear in any Keywords field, that module won't be loaded.</p>
+
+    <h3>What to include</h3>
+    <table>
+      <tr><th>Type</th><th>Example</th><th>Why</th></tr>
+      <tr><td><strong>Feature names</strong></td><td><code>profile, settings, checkout</code></td><td>Ticket descriptions usually mention the feature</td></tr>
+      <tr><td><strong>Class names</strong></td><td><code>[Feature]ViewModel, [Feature]Manager</code></td><td>Developers often name classes in ticket descriptions</td></tr>
+      <tr><td><strong>Domain terms</strong></td><td><code>opt-in, optin, marketing, promotional</code></td><td>Same concept, multiple spellings — include all variants</td></tr>
+      <tr><td><strong>API/endpoint names</strong></td><td><code>getuser, updateuser, /auth/refresh</code></td><td>API-related tickets often use endpoint names</td></tr>
+      <tr><td><strong>User-visible labels</strong></td><td><code>email subscription, push notification</code></td><td>Tickets written from UX perspective use UI labels</td></tr>
+    </table>
+
+    <div class="compare">
+      <div class="compare-col bad-col">
+        <h4>❌ Too vague — won't match</h4>
+        <ul>
+          <li><code>user, data, settings</code></li>
+          <li>Generic words that appear in every ticket</li>
+          <li>Only one or two keywords for a large module</li>
+        </ul>
+      </div>
+      <div class="compare-col good-col">
+        <h4>✅ Specific — matches reliably</h4>
+        <ul>
+          <li><code>opt-in, optin, contact options, promotional, email, marketing, [Settings]Fragment, [Profile]ViewModel</code></li>
+          <li>Mix of feature terms, class names, and UX vocabulary</li>
+          <li>8–15 keywords covering all the ways this module might appear in a ticket</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="modulemap-example">
+    <h2><span class="section-num">07</span>Real Example — MODULE_MAP entry</h2>
+    <p>This is an example entry for a profile/settings module. Notice how the keywords cover the ticket's terminology from multiple angles — class names, feature names, and ticket language all included.</p>
+
+    <pre><code><span class="cm">### :app/profile — User Profile & Settings</span>
+
+<span class="hl">| Field | Value |</span>
+<span class="hl">|-------|-------|</span>
+<span class="hl">| Path | `app/src/main/java/com/[package]/views/profile/` |</span>
+<span class="hl">| Language | Kotlin |</span>
+<span class="hl">| Pattern | MVVM + Hilt |</span>
+<span class="hl">| DI | Hilt |</span>
+<span class="hl">| Purpose | Profile display/edit, settings screen (notifications,</span>
+<span class="hl">|           promotional email opt-in, location), password change |</span>
+<span class="yn">| Keywords | profile, settings, opt-in, optin, contact options,</span>
+<span class="yn">|            promotional, email, marketing, notification, push,</span>
+<span class="yn">|            location, switch, [Profile]ViewModel,</span>
+<span class="yn">|            [Settings]Fragment, EditProfileDialog |</span>
+<span class="hl">| Key classes | `[Profile]ViewModel.kt`, `[Profile]Fragment.kt`,</span>
+<span class="hl">|               `[Settings]Fragment.kt`, `EditProfileDialog.kt` |</span>
+<span class="hl">| Depends on | `:core`, `:feature-api-sdk` |</span>
+<span class="hl">| Context file | `context/profile.md` |</span>
+<span class="hl">| Known debt | see `TECH_DEBT.md#profile` |</span></code></pre>
+
+    <p>When the agent reads a ticket about marketing opt-in, it matches <strong>marketing</strong>, <strong>opt-in</strong>, <strong>[SettingsFragment]</strong> → loads <code>context/profile.md</code> immediately without scanning the codebase.</p>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="modulemap-checklist">
+    <h2><span class="section-num">08</span>MODULE_MAP.md — Per-Ticket Checklist</h2>
+
+    <ul class="checklist">
+      <li><strong>Read the task MD.</strong> Note every module, class, and feature area mentioned.</li>
+      <li><strong>Check each area against the Module Index.</strong> Is there a matching entry?</li>
+      <li><strong>If yes — check the Keywords field.</strong> Do the task's terms appear? If not, add them to the existing entry.</li>
+      <li><strong>If no — add a new entry at the bottom.</strong> Fill in Path, Keywords, Purpose, Key classes, Context file at minimum.</li>
+      <li><strong>Never delete or rewrite existing entries.</strong> Only append or update keywords.</li>
+    </ul>
+
+    <div class="callout callout-yellow">
+      <strong>Time estimate:</strong> 3–5 minutes per new module entry. After your first 8–10 tickets, most new tickets need zero MODULE_MAP changes — the map is already populated.
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="datamodel-purpose">
+    <h2><span class="section-num">09</span>DATA_MODEL.md — Purpose</h2>
+    <p class="lead">The API contract reference. When the agent needs to call an endpoint or modify a request/response model, it reads DATA_MODEL.md to know the exact field names, types, and which fields already exist in the codebase vs need to be added.</p>
+
+    <p>Without DATA_MODEL.md the agent either has to find and read the DTO files itself (slower) or it guesses field names (dangerous — can introduce serialisation bugs). This applies equally to Android (<strong>Kotlin Codable / Gson / Moshi</strong>) and iOS (<strong>Swift Codable structs with <code>CodingKeys</code></strong>).</p>
+
+    <div class="callout callout-red">
+      <strong>The real risk of skipping it:</strong> The agent might add a field named <code>emailOptIn</code> when the actual JSON field is <code>email_marketing_opt_in</code>. On Android that compiles but fails at runtime (Gson/Moshi skips it). On iOS, a missing <code>CodingKeys</code> entry causes silent decode failure. DATA_MODEL.md prevents this entirely by documenting the exact JSON key → Swift/Kotlin property mapping.
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="datamodel-sections">
+    <h2><span class="section-num">10</span>DATA_MODEL.md — What to Document</h2>
+
+    <table>
+      <tr><th>Section</th><th>Document when</th><th>What to include</th></tr>
+      <tr>
+        <td><strong>Mapping Conventions</strong></td>
+        <td>Once at project setup</td>
+        <td>The DTO → domain → UI mapping rule. Anti-patterns. Mapper pattern examples.</td>
+      </tr>
+      <tr>
+        <td><strong>Domain Entities</strong></td>
+        <td>When a new domain model is introduced</td>
+        <td>Kotlin data class definition, field/type/source table</td>
+      </tr>
+      <tr>
+        <td><strong>Database Schema</strong></td>
+        <td>When a Room entity changes</td>
+        <td>Room version, entity definition, migration strategy</td>
+      </tr>
+      <tr>
+        <td><strong>API Contracts → Endpoint</strong></td>
+        <td>When a task calls an endpoint not yet documented</td>
+        <td>Method + path, request JSON, response JSON, field table with notes</td>
+      </tr>
+    </table>
+
+    <h3>The most important part — the field table</h3>
+    <p>Below every request/response JSON block, add a table that maps JSON field names to Kotlin property names and adds notes. This is what saves the agent from guessing.</p>
+
+    <pre><code><span class="hl">| Field | Kotlin property | Notes |</span>
+<span class="hl">|-------|----------------|-------|</span>
+<span class="ok">| `data.user.email_marketing_opt_in` | `...emailMarketingOptIn` | Authoritative — use this, not Ordering API |</span>
+<span class="yn">| `fields.email_marketing_opt_in` | `[RequestBody].Fields.emailMarketingOptIn` | Must be added — does not exist yet |</span>
+<span class="hl">| `fields.zipcode` | `[RequestBody].Fields.zipcode` | Already exists |</span></code></pre>
+
+    <p>The <strong>"does not exist yet"</strong> and <strong>"already exists"</strong> notes are critical — they tell the agent exactly what to create and what to leave alone.</p>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="datamodel-endpoint">
+    <h2><span class="section-num">11</span>Endpoint Entry Format</h2>
+    <p>Every endpoint section follows the same structure. Copy this pattern for each new endpoint.</p>
+
+    <pre><code><span class="cm">#### METHOD /path/to/endpoint</span>
+
+<span class="cm">**Used by:** `ServiceClass.methodName()` → `RepositoryClass.methodName()`</span>
+
+<span class="hl">Request:</span>
+<span class="hl">```json</span>
+<span class="hl">{</span>
+<span class="hl">  "field_name": "type or example value",</span>
+<span class="hl">  "nested": {</span>
+<span class="hl">    "field_name": "type"</span>
+<span class="hl">  }</span>
+<span class="hl">}</span>
+<span class="hl">```</span>
+
+<span class="hl">Response 200:</span>
+<span class="hl">```json</span>
+<span class="hl">{</span>
+<span class="hl">  "success": true,</span>
+<span class="hl">  "data": { ... }</span>
+<span class="hl">}</span>
+<span class="hl">```</span>
+
+<span class="hl">| Field | Kotlin property | Notes |</span>
+<span class="hl">|-------|----------------|-------|</span>
+<span class="hl">| `json.field_name` | `KotlinClass.propertyName` | [what the agent should know about this field] |</span>
+
+<span class="hl">Mapped in: `path/to/ResponseClass.kt`</span>
+
+<span class="cm">> Agent note: [any non-obvious instruction — e.g., "field X does not exist yet, add it as nullable"]</span></code></pre>
+
+    <h3>The Agent Note block</h3>
+    <p>The <code>&gt; Agent note:</code> blockquote at the end of an endpoint section is for non-obvious instructions specific to that endpoint. Use it to tell the agent things the JSON alone can't convey:</p>
+
+    <div class="field-grid">
+      <div class="field-row">
+        <div class="field-name">Field missing</div>
+        <div class="field-desc"><code>"email_marketing_opt_in is NOT yet in Fields data class. Add as nullable with null default so existing callers are unaffected."</code></div>
+        <div class="field-tag tag-critical">Use this</div>
+      </div>
+      <div class="field-row">
+        <div class="field-name">Wrong source</div>
+        <div class="field-desc"><code>"Do NOT use [LegacyApiResponse].optin for marketing opt-in — it reflects only the checkbox on a single transaction."</code></div>
+        <div class="field-tag tag-critical">Use this</div>
+      </div>
+      <div class="field-row">
+        <div class="field-name">Gotcha</div>
+        <div class="field-desc"><code>"birth_month and birth_day are 0 when not set — treat 0 as null, not a real date."</code></div>
+        <div class="field-tag tag-critical">Use this</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="datamodel-example">
+    <h2><span class="section-num">12</span>Real Example — DATA_MODEL entries</h2>
+    <p>These are entries written for a marketing opt-in ticket — two endpoints and one domain model. The pattern applies to any API-backed feature.</p>
+
+    <h3>Domain entity</h3>
+    <pre><code><span class="cm">### UserPreferences (domain model)</span>
+
+<span class="kw">data class</span> <span class="fn">UserPreferences</span>(
+    <span class="hl">val emailMarketingOptIn: Boolean = false,</span>
+    <span class="cm">// sourced from [ApiResponse].data.user.email_marketing_opt_in</span>
+    <span class="hl">val birthday: String? = null,</span>
+    <span class="cm">// formatted "MM/DD" from birth_month + birth_day</span>
+    <span class="hl">val zipcode: String? = null</span>
+)
+
+<span class="hl">| Field | Type | Source |</span>
+<span class="hl">|-------|------|--------|</span>
+<span class="hl">| emailMarketingOptIn | Boolean | [ApiResponse].data.user.email_marketing_opt_in |</span>
+<span class="hl">| birthday | String? | Formatted from birth_month + birth_day as "MM/DD" |</span>
+<span class="hl">| zipcode | String? | [ApiResponse].data.user.zipcode |</span></code></pre>
+
+    <h3>POST /user/preferences (read path)</h3>
+    <pre><code><span class="cm">#### POST /user/preferences</span>
+<span class="cm">**Used by:** `[FeatureService].refreshUserData()` → `[FeatureRepository].getUserInfo()`</span>
+
+<span class="hl">Request: { "access_token": "string", "identifiers": { "email": "string" } }</span>
+
+<span class="hl">Response 200 — key fields:</span>
+<span class="hl">{ "data": { "user": {</span>
+<span class="ok">    "email_marketing_opt_in": true,   ← READ THIS</span>
+<span class="hl">    "birth_month": 6,</span>
+<span class="hl">    "birth_day": 15,</span>
+<span class="hl">    "zipcode": "10001"</span>
+<span class="hl">}}}</span>
+
+<span class="hl">| Field | Kotlin property | Notes |</span>
+<span class="ok">| data.user.email_marketing_opt_in | ...emailMarketingOptIn | Authoritative opt-in — use this, NOT [OtherApi].optin |</span></code></pre>
+
+    <h3>POST /user/preferences/update (write path)</h3>
+    <pre><code><span class="cm">#### POST /user/preferences/update</span>
+<span class="cm">**Used by:** `[FeatureService].updateUserData()` → `[FeatureRepository].updateUserInfo()`</span>
+
+<span class="hl">Request fields:</span>
+<span class="hl">{</span>
+<span class="hl">  "access_token": "string",</span>
+<span class="hl">  "identifiers": { "email": "string" },</span>
+<span class="hl">  "fields": {</span>
+<span class="hl">    "zipcode": "string",            ← already exists in Fields data class</span>
+<span class="hl">    "birth_month": 6,               ← already exists</span>
+<span class="hl">    "birth_day": 15,                ← already exists</span>
+<span class="yn">    "email_marketing_opt_in": true  ← NOT YET in Fields — must be added</span>
+<span class="hl">  }</span>
+<span class="hl">}</span>
+
+<span class="hl">| Field | Kotlin property | Notes |</span>
+<span class="yn">| fields.email_marketing_opt_in | [RequestBody].Fields.emailMarketingOptIn | Must be added — does not exist yet. Add as Boolean? = null |</span>
+<span class="hl">| fields.zipcode | [RequestBody].Fields.zipcode | Already exists |</span>
+
+<span class="cm">> Agent note: Add emailMarketingOptIn as nullable (Boolean? = null) so</span>
+<span class="cm">> existing callers that don't set it are unaffected.</span></code></pre>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="datamodel-checklist">
+    <h2><span class="section-num">13</span>DATA_MODEL.md — Per-Ticket Checklist</h2>
+
+    <ul class="checklist">
+      <li><strong>Does the task call any API endpoint?</strong> If yes — is that endpoint documented in DATA_MODEL.md?</li>
+      <li><strong>If the endpoint is missing</strong> — add a full section: method + path, request JSON, response JSON, field table.</li>
+      <li><strong>Does the task add or change a field on an existing request?</strong> Add a row to that endpoint's field table with a "Must be added" note.</li>
+      <li><strong>Is there a non-obvious gotcha about this endpoint?</strong> Add an <code>&gt; Agent note:</code> block — wrong source, missing field, edge case values.</li>
+      <li><strong>Does the task introduce a new domain entity?</strong> Add it to the Domain Entities section with field/type/source table.</li>
+      <li><strong>Never remove existing endpoint sections</strong> — other tickets may reference them.</li>
+    </ul>
+
+    <div class="callout callout-yellow">
+      <strong>Time estimate:</strong> 5–10 minutes per new endpoint. UI-only tasks and tasks that only use existing, already-documented endpoints need zero DATA_MODEL changes.
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="lifecycle">
+    <h2><span class="section-num">14</span>File Lifecycle Over Time</h2>
+    <p>Both files follow the same growth pattern. Heavy at the start, nearly zero-maintenance after the first month.</p>
+
+    <table>
+      <tr><th>Stage</th><th>MODULE_MAP.md</th><th>DATA_MODEL.md</th></tr>
+      <tr>
+        <td><strong>Ticket 1</strong> (first task)</td>
+        <td>Write 3–5 new module entries for all areas the ticket touches</td>
+        <td>Write 1–3 endpoint sections for all APIs the ticket calls</td>
+      </tr>
+      <tr>
+        <td><strong>Tickets 2–5</strong></td>
+        <td>Add 1–2 new module entries per ticket as new areas are encountered</td>
+        <td>Add 1 new endpoint section per ticket when a new API is called</td>
+      </tr>
+      <tr>
+        <td><strong>Tickets 6–10</strong></td>
+        <td>Mostly no changes — modules already mapped. Occasional keyword additions.</td>
+        <td>Occasional new endpoint or field note. Most endpoints already documented.</td>
+      </tr>
+      <tr>
+        <td><strong>Ticket 10+</strong></td>
+        <td>Almost never changes unless a new Gradle module is added to the project</td>
+        <td>Only changes when a new external API is integrated or a new endpoint is added</td>
+      </tr>
+    </table>
+
+    <div class="callout callout-green">
+      <strong>The compounding benefit:</strong> Every entry you write today saves the next developer (and future tickets) 5–10 minutes of spec prep. After 10 tickets, new developers on the team can write a task MD and run it without any spec-kit changes at all — everything is already documented.
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="mistakes">
+    <h2><span class="section-num">15</span>Common Mistakes</h2>
+
+    <table>
+      <tr><th>Mistake</th><th>Impact</th><th>Fix</th></tr>
+      <tr>
+        <td><strong>Replacing instead of appending</strong></td>
+        <td>Future tasks for already-mapped modules fail to load context — agent scans codebase from scratch</td>
+        <td>Always scroll to bottom and add new entries. Never delete existing ones.</td>
+      </tr>
+      <tr>
+        <td><strong>Vague keywords</strong> (<code>user, data, screen</code>)</td>
+        <td>Agent loads wrong modules or too many modules — slow and inaccurate</td>
+        <td>Include class names, feature names, and ticket terminology. 8–15 keywords per module.</td>
+      </tr>
+      <tr>
+        <td><strong>Skipping the field table in DATA_MODEL</strong></td>
+        <td>Agent guesses Kotlin property names from JSON — can introduce serialisation bugs</td>
+        <td>Always add the field table mapping JSON names to Kotlin property names</td>
+      </tr>
+      <tr>
+        <td><strong>Not noting "does not exist yet"</strong></td>
+        <td>Agent assumes the field already exists and skips creating it, or creates a duplicate</td>
+        <td>Explicitly annotate each field as "already exists" or "must be added"</td>
+      </tr>
+      <tr>
+        <td><strong>Creating duplicate module entries</strong></td>
+        <td>Agent loads both entries, gets conflicting information</td>
+        <td>Search the file before adding. If the module exists, add keywords to the existing entry.</td>
+      </tr>
+      <tr>
+        <td><strong>Documenting UI-only tickets in DATA_MODEL</strong></td>
+        <td>Unnecessary work — adds noise</td>
+        <td>Only add to DATA_MODEL if the task touches API contracts or domain entities</td>
+      </tr>
+    </table>
+  </section>
+
+</main>
+
+<footer class="app-footer">
+  <span>🔒 Confidential</span>
+  <span class="footer-sep">|</span>
+  <span class="footer-brand">Bounteous</span>
+</footer>
+
+<script>
+  const sections = document.querySelectorAll('section[id]');
+  const links    = document.querySelectorAll('nav a[href^="#"]');
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const active = document.querySelector(`nav a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

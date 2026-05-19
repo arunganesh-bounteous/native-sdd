@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spec-Kit Files — Complete Guide</title>
+<style>
+  :root {
+    --bg: #0b111c;
+    --surface: #0f1825;
+    --surface2: #162033;
+    --border: #1e2e47;
+    --text: #e8eaf2;
+    --text-muted: #9ba3be;
+    --text-dim: #647090;
+    --accent: #38bdf8;
+    --accent-dim: rgba(56,189,248,0.12);
+    --accent2: #818cf8;
+    --success: #3ecf8e;
+    --success-dim: rgba(62,207,142,0.08);
+    --warning: #f59e0b;
+    --warning-dim: rgba(245,158,11,0.08);
+    --danger: #ef4444;
+    --danger-dim: rgba(239,68,68,0.08);
+    --nav-w: 270px;
+    --radius: 8px;
+    --mono: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    display: flex;
+  }
+
+  /* ── Sidebar ── */
+  nav {
+    width: var(--nav-w);
+    height: 100vh;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    position: fixed;
+    top: 0; left: 0;
+    overflow-y: auto;
+    padding: 24px 0 40px;
+    z-index: 100;
+  }
+
+  .nav-logo {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .nav-logo .badge {
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    display: inline-block;
+    margin-bottom: 8px;
+  }
+  .nav-logo h1 { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.3; }
+
+  .nav-section {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 12px 20px 4px;
+  }
+
+  nav a {
+    display: block;
+    padding: 5px 20px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 12px;
+    border-left: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  nav a:hover { color: var(--text); background: var(--surface2); }
+  nav a.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-dim); }
+  nav a.sub { padding-left: 32px; font-size: 11px; color: var(--text-dim); }
+  nav a.sub:hover { color: var(--text-muted); }
+
+  /* ── Main ── */
+  main {
+    margin-left: var(--nav-w);
+    max-width: 900px;
+    padding: 60px 52px;
+    width: 100%;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    margin-bottom: 64px;
+    padding-bottom: 40px;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero .tag {
+    display: inline-block;
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 16px;
+  }
+  .hero h1 { font-size: 32px; font-weight: 800; line-height: 1.2; margin-bottom: 16px; }
+  .hero p { font-size: 16px; color: var(--text-muted); max-width: 620px; }
+
+  /* ── File sections ── */
+  .file-section { margin-bottom: 100px; scroll-margin-top: 40px; }
+
+  .file-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .file-icon {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-radius: var(--radius);
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .file-header-text h2 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .file-header-text .filename {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    background: var(--accent-dim);
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 8px;
+  }
+  .file-header-text p { font-size: 14px; color: var(--text-muted); }
+
+  .who-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-top: 8px;
+  }
+  .who-badge.tech-lead { background: rgba(108,123,255,0.15); color: var(--accent); }
+  .who-badge.team { background: var(--success-dim); color: var(--success); }
+  .who-badge.data-owner { background: var(--warning-dim); color: var(--warning); }
+
+  .when-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-left: 8px;
+  }
+
+  /* ── Sub-sections ── */
+  .file-section h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 36px 0 12px;
+    color: var(--text);
+  }
+  .file-section h4 {
+    font-size: 13px;
+    font-weight: 700;
+    margin: 20px 0 8px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .file-section p { margin-bottom: 12px; color: var(--text-muted); font-size: 14px; }
+
+  /* ── Callouts ── */
+  .callout {
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin: 20px 0;
+    font-size: 13px;
+    line-height: 1.6;
+    border-left: 3px solid;
+  }
+  .callout-blue { background: var(--accent-dim); border-color: var(--accent); color: var(--text); }
+  .callout-green { background: var(--success-dim); border-color: var(--success); color: var(--text); }
+  .callout-yellow { background: var(--warning-dim); border-color: var(--warning); color: var(--text); }
+  .callout-red { background: var(--danger-dim); border-color: var(--danger); color: var(--text); }
+  .callout strong { color: var(--text); }
+
+  /* ── Code blocks ── */
+  pre {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    overflow-x: auto;
+    margin: 16px 0;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  code { font-family: var(--mono); font-size: 12px; }
+  p code, li code, td code {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 12px;
+    color: var(--success);
+  }
+  .ok { color: var(--success); }
+  .bad { color: var(--danger); }
+  .yn { color: var(--warning); }
+  .cm { color: var(--text-dim); font-style: italic; }
+  .kw { color: var(--accent); }
+  .hl { color: var(--text); }
+  .fn { color: #e2a855; }
+
+  /* ── Compare panels ── */
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .compare-col {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .compare-col.bad-col { border-color: rgba(239,68,68,0.3); }
+  .compare-col.good-col { border-color: rgba(62,207,142,0.3); }
+  .compare-col h4 { font-size: 12px; font-weight: 700; margin-bottom: 10px; }
+  .compare-col.bad-col h4 { color: var(--danger); }
+  .compare-col.good-col h4 { color: var(--success); }
+  .compare-col p, .compare-col li { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+  .compare-col ul { padding-left: 16px; }
+  .compare-col li { margin-bottom: 4px; }
+
+  /* ── Field table ── */
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+  th { background: var(--surface2); color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text-muted); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td:first-child { color: var(--text); font-weight: 600; white-space: nowrap; }
+  .tag-req { background: var(--accent-dim); color: var(--accent); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; display: inline-block; }
+  .tag-crit { background: rgba(239,68,68,0.15); color: var(--danger); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; display: inline-block; }
+  .tag-opt { background: var(--surface2); color: var(--text-dim); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; display: inline-block; border: 1px solid var(--border); }
+
+  /* ── Checklist ── */
+  .checklist { list-style: none; padding: 0; margin: 12px 0; display: flex; flex-direction: column; gap: 8px; }
+  .checklist li { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--text-muted); }
+  .checklist li::before { content: '☐'; color: var(--accent); flex-shrink: 0; margin-top: 1px; }
+
+  /* ── Mistake list ── */
+  .mistake-list { list-style: none; padding: 0; margin: 12px 0; display: flex; flex-direction: column; gap: 10px; }
+  .mistake-list li {
+    background: var(--danger-dim);
+    border: 1px solid rgba(239,68,68,0.2);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+  .mistake-list li strong { color: var(--danger); display: block; margin-bottom: 2px; font-size: 12px; }
+  .mistake-list li .fix { color: var(--success); display: block; margin-top: 4px; font-size: 12px; }
+  .mistake-list li .fix::before { content: '→ Fix: '; font-weight: 700; }
+
+  /* ── Section divider ── */
+  .section-label {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--accent);
+    background: var(--accent-dim);
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-bottom: 8px;
+  }
+
+  /* ── Tip box ── */
+  .tip {
+    display: flex;
+    gap: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin: 16px 0;
+    font-size: 13px;
+    color: var(--text-muted);
+    align-items: flex-start;
+  }
+  .tip-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+  /* ── Update frequency ── */
+  .update-freq {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 12px 0;
+  }
+  .freq-pill {
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+  }
+  .freq-once { background: var(--success-dim); color: var(--success); border: 1px solid rgba(62,207,142,0.2); }
+  .freq-rare { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(108,123,255,0.2); }
+  .freq-ticket { background: var(--warning-dim); color: var(--warning); border: 1px solid rgba(245,158,11,0.2); }
+
+  /* ── Footer ── */
+  .app-footer {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: 28px; display: flex; align-items: center; justify-content: center;
+    background: var(--surface); border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--text-muted); letter-spacing: 0.3px;
+    z-index: 200; user-select: none;
+  }
+  .app-footer .footer-sep { margin: 0 8px; color: var(--border); }
+  .app-footer .footer-brand {
+    font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+    background: linear-gradient(90deg, #38bdf8, #818cf8);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  body { padding-bottom: 28px; }
+
+  @media (max-width: 900px) {
+    nav { display: none; }
+    main { margin-left: 0; padding: 32px 20px; }
+    .compare { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav id="sidebar">
+  <div class="nav-logo">
+    <div class="badge">Spec-Kit Guide</div>
+    <h1>All Spec Files<br>Explained</h1>
+    <p style="font-size:10px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;margin-top:8px;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Bounteous</p>
+  </div>
+
+  <div class="nav-section">Overview</div>
+  <a href="#intro">How to use this guide</a>
+  <a href="#load-order">When the agent loads each file</a>
+
+  <div class="nav-section">spec-kit/ Files</div>
+  <a href="#architecture">🏛️ ARCHITECTURE.md</a>
+  <a class="sub" href="#arch-fields">Fields</a>
+  <a class="sub" href="#arch-adr">Writing ADRs</a>
+  <a class="sub" href="#arch-mistakes">Common mistakes</a>
+
+  <a href="#conventions">📐 CONVENTIONS.md</a>
+  <a class="sub" href="#conv-fields">Fields</a>
+  <a class="sub" href="#conv-quality-gate">Quality Gate section</a>
+  <a class="sub" href="#conv-mistakes">Common mistakes</a>
+
+  <a href="#migrations">🔄 MIGRATION_RULES.md</a>
+  <a class="sub" href="#mig-scope-guard">Scope Guard</a>
+  <a class="sub" href="#mig-patterns">Writing patterns</a>
+  <a class="sub" href="#mig-mistakes">Common mistakes</a>
+
+  <a href="#modulemap">📦 MODULE_MAP.md</a>
+  <a class="sub" href="#mod-fields">Fields</a>
+  <a class="sub" href="#mod-routing">Routing vs registry</a>
+  <a class="sub" href="#mod-mistakes">Common mistakes</a>
+
+  <a href="#techdebt">🔧 TECH_DEBT.md</a>
+  <a class="sub" href="#debt-fields">Fields</a>
+  <a class="sub" href="#debt-agent-rule">Writing agent rules</a>
+  <a class="sub" href="#debt-mistakes">Common mistakes</a>
+
+  <a href="#testing">🧪 TESTING.md</a>
+  <a class="sub" href="#test-naming">Naming convention</a>
+  <a class="sub" href="#test-pattern">ViewModel pattern</a>
+  <a class="sub" href="#test-mistakes">Common mistakes</a>
+
+  <a href="#datamodel">🗄️ DATA_MODEL.md</a>
+  <a class="sub" href="#dm-mapping">Mapping rules</a>
+  <a class="sub" href="#dm-endpoints">Endpoint entries</a>
+  <a class="sub" href="#dm-brownfield">Brownfield approach</a>
+  <a class="sub" href="#dm-mistakes">Common mistakes</a>
+
+  <div class="nav-section">context/ Files</div>
+  <a href="#index">🗂️ context/_index.md</a>
+  <a class="sub" href="#index-keywords">Writing keywords</a>
+  <a class="sub" href="#index-vs-modulemap">vs MODULE_MAP</a>
+  <a class="sub" href="#index-mistakes">Common mistakes</a>
+
+  <div class="nav-section">More Guides</div>
+  <a href="tutorial.html">📖 Main Tutorial</a>
+  <a href="tutorial-spec-files.html">🗂️ MODULE_MAP &amp; DATA_MODEL</a>
+  <a href="setup-wizard.html">🧙 Setup Wizard</a>
+</nav>
+
+<main>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="tag">Agentic SDD — Spec-Kit Reference</div>
+  <h1>Every Spec File,<br>Explained in Full</h1>
+  <p>These files are the heart of the system. The agent reads them before touching a single line of code. A vague or incomplete spec file produces vague or incorrect output. This guide shows you exactly what to write, what to avoid, and why each field matters.</p>
+</div>
+
+<!-- ─────────────────────────────────────────────────── -->
+<section id="intro" class="file-section" style="margin-bottom:60px">
+  <h3>How to use this guide</h3>
+  <p>Each section covers one file. Read the section for each file you're about to fill in. Pay particular attention to the <strong>Critical fields</strong> and <strong>Common mistakes</strong> — these are the parts developers most often get wrong, and they directly impact agent output quality.</p>
+
+  <div class="callout callout-blue">
+    <strong>Rule for all spec-kit files:</strong> The agent reads these files but never modifies them. They are human-authored, version-controlled, and reviewed in PRs. Treat them like code — concise, accurate, and maintained.
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────── -->
+<section id="load-order" class="file-section" style="margin-bottom:60px">
+  <h3>When the agent loads each file</h3>
+  <table>
+    <tr><th>File</th><th>Loaded when</th><th>Tier</th></tr>
+    <tr><td><code>ARCHITECTURE.md</code></td><td>Every task, unconditionally</td><td>1</td></tr>
+    <tr><td><code>MODULE_MAP.md</code></td><td>Every task, unconditionally</td><td>1</td></tr>
+    <tr><td><code>CONVENTIONS.md</code></td><td>Every task, unconditionally</td><td>2</td></tr>
+    <tr><td><code>MIGRATION_RULES.md</code></td><td>Every task, unconditionally</td><td>2</td></tr>
+    <tr><td><code>TESTING.md</code></td><td>Every task, unconditionally</td><td>2</td></tr>
+    <tr><td><code>context/_index.md</code></td><td>Every task — routes to module context files</td><td>3</td></tr>
+    <tr><td><code>TECH_DEBT.md</code></td><td>When task touches legacy code or debt-registered files</td><td>4</td></tr>
+    <tr><td><code>DATA_MODEL.md</code></td><td>When task touches APIs, network, DB, or data models</td><td>5</td></tr>
+  </table>
+  <p>Tiers 1–3 are always loaded. Keep them concise — every byte is read on every task.</p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="architecture" class="file-section">
+  <div class="file-header">
+    <div class="file-icon">🏛️</div>
+    <div class="file-header-text">
+      <div class="filename">spec-kit/ARCHITECTURE.md</div>
+      <h2>Architecture</h2>
+      <p>Module graph, navigation, threading, networking, storage, known violations, and Architecture Decision Records. The agent reads this on every task.</p>
+      <span class="who-badge tech-lead">✦ Tech lead writes</span>
+      <span class="when-badge">Updated when architecture decisions change</span>
+    </div>
+  </div>
+
+  <div class="callout callout-red">
+    <strong>Most important file in the system.</strong> An ADR that says "we use MVVM because of testability" prevents the agent from introducing MVP patterns. A missing violations list causes the agent to "fix" intentional exceptions. Get this right first.
+  </div>
+
+  <h3 id="arch-fields">Fields and sections</h3>
+  <table>
+    <tr><th>Section</th><th>Importance</th><th>What to write</th></tr>
+    <tr><td>Module Structure table</td><td><span class="tag-req">Required</span></td><td>One row per Gradle module — name, language, pattern, DI, one-line note. Helps the agent understand module boundaries.</td></tr>
+    <tr><td>Navigation</td><td><span class="tag-req">Required</span></td><td>NavGraph type, which Activity/Fragment hosts NavHost, deep link handling pattern.</td></tr>
+    <tr><td>Threading Model</td><td><span class="tag-req">Required</span></td><td>Every async approach in use with the modules that use it. Critical for migration rules to apply correctly.</td></tr>
+    <tr><td>State Management</td><td><span class="tag-req">Required</span></td><td>StateFlow, LiveData, RxJava — where each is used. Agent uses this to know what "new" vs "legacy" looks like.</td></tr>
+    <tr><td>Networking</td><td><span class="tag-req">Required</span></td><td>Library + version, base URL strategy, auth mechanism, custom interceptors. Do NOT put this in DATA_MODEL.md.</td></tr>
+    <tr><td>Known Violations</td><td><span class="tag-crit">Critical</span></td><td>List every class/file that intentionally breaks the pattern and why. Without this, the agent fixes them.</td></tr>
+    <tr><td>Target State</td><td><span class="tag-req">Required</span></td><td>Where the codebase is headed. Agent uses this for new screens and features.</td></tr>
+    <tr><td>ADRs</td><td><span class="tag-crit">Critical</span></td><td>One entry per significant architectural decision. Must include the Reason — not just the Decision.</td></tr>
+  </table>
+
+  <h3 id="arch-adr">Writing good ADRs</h3>
+  <p>ADRs are what make architecture knowledge explicit instead of tribal. The agent uses them to understand why — which stops it from "improving" things that are intentional.</p>
+
+  <div class="compare">
+    <div class="compare-col bad-col">
+      <h4>❌ ADR without reason — useless to agent</h4>
+      <pre><code><span class="bad">### ADR-001 — Use MVVM
+- Date: 2024-01-15
+- Decision: We use MVVM pattern.
+- Reason: It's a modern pattern.
+- Consequence: ViewModels for all screens.</span></code></pre>
+    </div>
+    <div class="compare-col good-col">
+      <h4>✅ ADR with reason — agent understands the constraint</h4>
+      <pre><code><span class="ok">### ADR-001 — MVVM over MVP for testability
+- Date: 2024-01-15
+- Decision: Use MVVM with Hilt-injected ViewModels.
+  No Presenters. No manual dependency wiring.
+- Reason: MVP requires concrete Fragment/Activity
+  references in Presenters, making unit tests
+  brittle. MVVM with ViewModel + StateFlow allows
+  full ViewModel testing with no Android framework.
+- Consequence: Agent must never introduce a
+  Presenter class. All business logic lives in
+  ViewModel or UseCase.</span></code></pre>
+    </div>
+  </div>
+
+  <h3>Known Violations — the most commonly skipped section</h3>
+  <p>Every codebase has screens or classes that break the pattern for a legitimate reason. Without this list, the agent treats them as bugs and "fixes" them.</p>
+
+  <div class="compare">
+    <div class="compare-col bad-col">
+      <h4>❌ Missing violations list</h4>
+      <p>Agent reads the MVVM rule. Finds <code>LegacyLoginActivity</code> with business logic in <code>onCreate()</code>. Moves logic to a ViewModel — breaking the intent behind a class that's deliberately untouched until the migration ticket.</p>
+    </div>
+    <div class="compare-col good-col">
+      <h4>✅ Violations documented</h4>
+      <pre><code><span class="ok">### Known Architecture Violations
+
+- `LegacyLoginActivity.kt`: Business logic in
+  onCreate() — MVP pattern. Intentionally kept
+  until TICKET-450 migration. Do not refactor.
+
+- `OrderSummaryFragment.kt`: Calls Retrofit
+  directly (no Repository). Tech debt DEBT-003.
+  Do not add more direct calls here.</span></code></pre>
+    </div>
+  </div>
+
+  <h3 id="arch-mistakes">Common mistakes</h3>
+  <ul class="mistake-list">
+    <li>
+      <strong>Empty or vague ADR reason</strong>
+      "We chose X" without explaining why blocks the agent from understanding what it must protect.
+      <span class="fix">Write the reason as a constraint: "Because of Y, the agent must never do Z."</span>
+    </li>
+    <li>
+      <strong>Putting base URLs in DATA_MODEL.md</strong>
+      DATA_MODEL is for data shapes — not infrastructure config.
+      <span class="fix">Base URLs, auth mechanism, and interceptors live here under Networking.</span>
+    </li>
+    <li>
+      <strong>Not updating when patterns change</strong>
+      If the team moves from LiveData to StateFlow and ARCHITECTURE.md still says "StateFlow for new, LiveData for legacy", the agent will treat new StateFlow code as a violation.
+      <span class="fix">Update the Threading Model and State Management sections when the team's approach changes.</span>
+    </li>
+  </ul>
+
+  <h3>Per-ticket checklist</h3>
+  <ul class="checklist">
+    <li>Task introduces a new module → add a row to the Module Structure table</li>
+    <li>Task changes navigation approach → update Navigation section</li>
+    <li>Task introduces a new async pattern → update Threading Model</li>
+    <li>A significant architectural decision was made for this task → write an ADR</li>
+    <li>Task works around the pattern intentionally → add to Known Violations</li>
+  </ul>
+  <div class="update-freq">
+    <span class="freq-rare">🔵 Rarely updated — most tasks need no change</span>
+    <span class="freq-ticket">🟡 Always update when architecture decisions change</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="conventions" class="file-section">
+  <div class="file-header">
+    <div class="file-icon">📐</div>
+    <div class="file-header-text">
+      <div class="filename">spec-kit/CONVENTIONS.md</div>
+      <h2>Conventions</h2>
+      <p>Non-negotiable coding standards with ❌/✅ examples. Naming, patterns, ViewModel rules, DI, Compose, Resources — and the Quality Gate the agent runs on every task.</p>
+      <span class="who-badge tech-lead">✦ Tech lead writes</span>
+      <span class="when-badge">Updated when team coding standards change</span>
+    </div>
+  </div>
+
+  <div class="callout callout-red">
+    <strong>The Quality Gate section at the bottom is what the agent scans against in Step 6b for every task.</strong> It must be accurate for your platform. Android/Kotlin defaults are provided — non-Android teams must replace this table.
+  </div>
+
+  <h3 id="conv-fields">Sections and what they control</h3>
+  <table>
+    <tr><th>Section</th><th>Importance</th><th>What to write</th></tr>
+    <tr><td>Kotlin Core Rules</td><td><span class="tag-req">Required</span></td><td>Non-negotiable language rules with anti-pattern code examples. The agent follows these exactly.</td></tr>
+    <tr><td>Naming Conventions</td><td><span class="tag-req">Required</span></td><td>Table of element type → convention → example. Deviating here causes test naming failures in the Quality Gate.</td></tr>
+    <tr><td>Package Structure</td><td><span class="tag-req">Required</span></td><td>Exact folder structure for a feature module. Agent uses this when creating new files.</td></tr>
+    <tr><td>ViewModel Conventions</td><td><span class="tag-crit">Critical</span></td><td>StateFlow, SharedFlow, no Android imports, no direct DataSource calls. Include a full working ViewModel example.</td></tr>
+    <tr><td>Coroutines and Flow</td><td><span class="tag-req">Required</span></td><td>Dispatcher rules, no GlobalScope, no Thread.sleep, stateIn pattern, Result<T> return type.</td></tr>
+    <tr><td>Compose (if used)</td><td><span class="tag-opt">Optional</span></td><td>Stateless composables, collectAsStateWithLifecycle, Material 3 only, hiltViewModel at screen level only.</td></tr>
+    <tr><td>Resources</td><td><span class="tag-req">Required</span></td><td>strings.xml, no hardcoded colors/dims. Quality Gate checks this on every file.</td></tr>
+    <tr><td>DI (Hilt)</td><td><span class="tag-req">Required</span></td><td>@HiltViewModel, @Singleton scope rules, no companion factories.</td></tr>
+    <tr><td><strong>Quality Gate</strong></td><td><span class="tag-crit">Critical</span></td><td>The table the agent applies in Step 6b. Platform-specific. Non-Android teams MUST replace this.</td></tr>
+  </table>
+
+  <h3>Rules need anti-patterns, not just patterns</h3>
+
+  <div class="compare">
+    <div class="compare-col bad-col">
+      <h4>❌ Rule without anti-pattern — easy to misapply</h4>
+      <pre><code><span class="bad">## Rules
+- Use StateFlow for state.
+- No Android imports in ViewModel.
+- All coroutines in viewModelScope.</span></code></pre>
+    </div>
+    <div class="compare-col good-col">
+      <h4>✅ Rule paired with anti-pattern — unambiguous</h4>
+      <pre><code><span class="ok">// ❌ LiveData — banned for new state
+private val _user = MutableLiveData&lt;User&gt;()
+
+// ✅ StateFlow only
+private val _user = MutableStateFlow&lt;User?&gt;(null)
+val user = _user.asStateFlow()
+
+// ❌ Android import in ViewModel — banned
+class ProfileViewModel : ViewModel() {
+    fun showToast(context: Context) { ... }
+}
+
+// ✅ No Android framework references
+class ProfileViewModel : ViewModel() {
+    private val _message = MutableSharedFlow&lt;String&gt;()
+    val message = _message.asSharedFlow()
+}</span></code></pre>
+    </div>
+  </div>
+
+  <h3 id="conv-quality-gate">The Quality Gate — platform-specific</h3>
+  <p>This section is at the bottom of CONVENTIONS.md and is the only part of the spec-kit that the agent actively runs as a checklist, not just reads for guidance.</p>
+
+  <div class="callout callout-yellow">
+    <strong>iOS / Swift teams:</strong> The setup wizard generates a Swift-specific Quality Gate automatically. Review and extend it — key checks include: no force-unwrap (<code>!</code>), no force-cast (<code>as!</code>), <code>@MainActor</code> for all UI-touching code, no business logic in SwiftUI views, no UIKit imports inside SwiftUI files, structs preferred over classes for value types, and test mocks via protocol conformance (not subclassing).<br><br>
+    <strong>Web / other platforms:</strong> Replace the Quality Gate table entirely with your platform-appropriate checks. The agent reads it from <code>CONVENTIONS.md</code> — not from <code>CLAUDE.md</code>.
+  </div>
+
+  <pre><code><span class="cm">## Quality Gate
+> Agent (Step 6b): scan every file you created or modified against every
+> check in this table. Fix failures before proceeding.</span>
+
+<span class="hl">| Check | Rule |</span>
+<span class="hl">|-------|------|</span>
+<span class="ok">| No !! operators | Use ?.let {}, ?: return, or requireNotNull |</span>
+<span class="ok">| No new LiveData | New state uses StateFlow only |</span>
+<span class="ok">| No GlobalScope | All coroutines in viewModelScope or lifecycleScope |</span>
+<span class="ok">| No hardcoded strings | All user-visible text in strings.xml |</span>
+<span class="ok">| No hardcoded colors/dimensions | Use theme attributes or dimens.xml |</span>
+<span class="ok">| Sealed types exhaustive | No else on when over sealed class/interface |</span>
+<span class="ok">| No business logic in UI | Composables/Fragments call ViewModel only |</span>
+<span class="ok">| ViewModel has no Android imports | No Context, View, FragmentManager |</span>
+<span class="ok">| DTOs not exposed to UI | Repository returns domain models only |</span>
+<span class="ok">| Tests follow naming convention | functionName_scenario_expectedResult |</span></code></pre>
+
+  <h3 id="conv-mistakes">Common mistakes</h3>
+  <ul class="mistake-list">
+    <li>
+      <strong>Leaving the Quality Gate as Android defaults for a non-Android project</strong>
+      The agent will check for <code>!!</code> operators and <code>strings.xml</code> on a TypeScript project.
+      <span class="fix">Replace the Quality Gate table entirely with platform-appropriate checks.</span>
+    </li>
+    <li>
+      <strong>Writing rules without code examples</strong>
+      "No business logic in UI" is abstract. The agent needs to see what business logic in UI looks like.
+      <span class="fix">Every rule needs a ❌ anti-pattern and a ✅ correct version as actual code.</span>
+    </li>
+    <li>
+      <strong>Overly long CONVENTIONS.md</strong>
+      This file is loaded on every task. A 10-page file wastes tokens on every run.
+      <span class="fix">Keep to the most important rules. Platform defaults cover the rest.</span>
+    </li>
+  </ul>
+
+  <h3>Per-ticket checklist</h3>
+  <ul class="checklist">
+    <li>Team adopts a new pattern (new library, new Compose APIs) → add a section with ❌/✅ examples</li>
+    <li>Agent Quality Gate check caused a false positive → adjust the rule in the Quality Gate table</li>
+    <li>Platform changes (iOS migration, React Native) → replace Quality Gate table entirely</li>
+  </ul>
+  <div class="update-freq">
+    <span class="freq-once">🟢 Set up once during onboarding</span>
+    <span class="freq-rare">🔵 Updated when team standards change</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="migrations" class="file-section">
+  <div class="file-header">
+    <div class="file-icon">🔄</div>
+    <div class="file-header-text">
+      <div class="filename">spec-kit/MIGRATION_RULES.md</div>
+      <h2>Migration Rules</h2>
+      <p>How the agent handles legacy patterns. Loaded on every task. The Scope Guard prevents whole-file rewrites.</p>
+      <span class="who-badge tech-lead">✦ Tech lead writes</span>
+      <span class="when-badge">Updated when a new legacy pattern is found</span>
+    </div>
+  </div>
+
+  <div class="callout callout-blue">
+    <strong>The single most important concept here is the Scope Guard.</strong> Without it, the agent applying LiveData→StateFlow rules would rewrite entire ViewModel files when a task only needs one new field added.
+  </div>
+
+  <h3 id="mig-scope-guard">The Scope Guard</h3>
+  <p>Every migration rule applies only to lines the agent adds or the immediate surrounding context — never the whole file.</p>
+
+  <div class="compare">
+    <div class="compare-col bad-col">
+      <h4>❌ Without Scope Guard — whole file rewrite</h4>
+      <p>Task: "Add isRefreshing state to ProfileViewModel"</p>
+      <p>Agent reads: "Replace LiveData with StateFlow"</p>
+      <p>Result: Agent rewrites all 15 LiveData properties in the ViewModel to StateFlow — untested, unreviewed, not part of the task.</p>
+    </div>
+    <div class="compare-col good-col">
+      <h4>✅ With Scope Guard — minimal diff</h4>
+      <p>Task: "Add isRefreshing state to ProfileViewModel"</p>
+      <p>Agent reads: "Apply only to lines you add"</p>
+      <p>Result: Existing LiveData untouched. New <code>isRefreshing</code> is StateFlow. Agent logs the existing LiveData as a follow-up recommendation.</p>
+    </div>
+  </div>
+
+  <div class="tip">
+    <div class="tip-icon">💡</div>
+    The Scope Guard is already in the file template — don't remove it. But also make sure your actual rules don't accidentally override it with language like "replace all X with Y".
+  </div>
+
+  <h3 id="mig-patterns">Writing a migration pattern entry</h3>
+  <p>Each pattern needs: the rule (what to do and not do), the scope (which files trigger it), and a ❌/✅ code example.</p>
+
+  <pre><code><span class="cm">## LiveData → StateFlow</span>
+
+<span class="hl">- Do not migrate existing LiveData unless the task explicitly scopes it.</span>
+<span class="hl">- When touching a ViewModel that uses LiveData:</span>
+<span class="hl">  - Do not change existing MutableLiveData declarations.</span>
+<span class="hl">  - Use MutableStateFlow for any NEW state added by this task.</span>
+<span class="hl">  - Do not mix observe() and collectAsStateWithLifecycle() for the same property.</span>
+
+<span class="bad">// ❌ Adding new state as LiveData</span>
+<span class="bad">private val _isLoading = MutableLiveData&lt;Boolean&gt;()  // banned — new state uses StateFlow</span>
+
+<span class="ok">// ✅ New state added by this task uses StateFlow</span>
+<span class="ok">private val _legacyUser = MutableLiveData&lt;User&gt;()     // existing — do not touch</span>
+<span class="ok">private val _isLoading = MutableStateFlow(false)       // new state — StateFlow only</span>
+<span class="cm">// TODO [DEBT-XXX]: migrate existing LiveData to StateFlow</span></code></pre>
+
+  <h3>Patterns to document</h3>
+  <table>
+    <tr><th>Pattern</th><th>Trigger condition</th><th>Must include</th></tr>
+    <tr><td>LiveData → StateFlow</td><td>Any ViewModel touch</td><td>Don't migrate existing, new uses StateFlow, TODO comment format</td></tr>
+    <tr><td>RxJava → Coroutines</td><td>Any file with RxJava imports</td><td>Don't add new chains, bridge pattern for interaction</td></tr>
+    <tr><td>MVP → MVVM</td><td>Any Presenter touch</td><td>Create new ViewModel alongside, don't move existing Presenter logic</td></tr>
+    <tr><td>SharedPreferences → DataStore</td><td>Any prefs read/write</td><td>New keys go to DataStore, don't migrate existing in same task</td></tr>
+    <tr><td>AsyncTask</td><td>Any AsyncTask class touch</td><td>Never add to existing AsyncTask, new work is suspend fun</td></tr>
+    <tr><td>Java files</td><td>Any .java file touch</td><td>New logic in separate Kotlin file, don't convert Java</td></tr>
+  </table>
+
+  <h3 id="mig-mistakes">Common mistakes</h3>
+  <ul class="mistake-list">
+    <li>
+      <strong>Not listing a legacy pattern that exists in your codebase</strong>
+      If RxJava code exists but there's no rule for it, the agent will either replicate it or try to remove it.
+      <span class="fix">Audit your codebase for legacy patterns before filling this file. Every pattern that exists needs a rule.</span>
+    </li>
+    <li>
+      <strong>Writing "replace X with Y" without the Scope Guard constraint</strong>
+      "Replace LiveData with StateFlow" reads as a global instruction.
+      <span class="fix">Always phrase rules as "When touching a file that uses X, do not add new X — new code uses Y."</span>
+    </li>
+    <li>
+      <strong>Missing the TODO comment format</strong>
+      When the agent leaves old patterns in place, it should mark them. Without a consistent format, debt tracking is inconsistent.
+      <span class="fix">Specify the exact comment format: <code>// TODO [DEBT-XXX]: migrate — [reason]</code></span>
+    </li>
+  </ul>
+
+  <h3>Per-ticket checklist</h3>
+  <ul class="checklist">
+    <li>Task touches a legacy pattern not yet in this file → add a new section for it</li>
+    <li>Agent created a TODO comment about a legacy pattern → verify format matches this file</li>
+    <li>Task explicitly migrates a pattern → no change needed (task scope overrides the rule)</li>
+  </ul>
+  <div class="update-freq">
+    <span class="freq-once">🟢 Set up once with all known legacy patterns</span>
+    <span class="freq-rare">🔵 Updated when a new legacy pattern is discovered</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="modulemap" class="file-section">
+  <div class="file-header">
+    <div class="file-icon">📦</div>
+    <div class="file-header-text">
+      <div class="filename">spec-kit/MODULE_MAP.md</div>
+      <h2>Module Map</h2>
+      <p>The module registry. Source paths, key classes, patterns, and debt anchors — one entry per module. <strong>Android:</strong> one entry per Gradle module. <strong>iOS:</strong> one entry per Swift Package target or logical Xcode group. Used after routing, not for routing.</p>
+      <span class="who-badge tech-lead">✦ Tech lead writes</span>
+      <span class="when-badge">Updated when a new module is added</span>
+    </div>
+  </div>
+
+  <div class="callout callout-blue">
+    <strong>Routing is NOT done here — it is done in <code>context/_index.md</code>.</strong> MODULE_MAP is the registry the agent consults after routing to get source paths and key classes. Developers confuse these two — see the comparison below.
+  </div>
+
+  <h3 id="mod-routing">MODULE_MAP vs context/_index.md</h3>
+  <table>
+    <tr><th></th><th>MODULE_MAP.md</th><th>context/_index.md</th></tr>
+    <tr><td><strong>Role</strong></td><td>Module registry — metadata</td><td>Agent routing table — authoritative</td></tr>
+    <tr><td><strong>What it contains</strong></td><td>Path, language, pattern, key classes, debt anchor</td><td>Keywords → context file mapping</td></tr>
+    <tr><td><strong>Agent uses it to</strong></td><td>Find source paths and fallback files when no context file exists</td><td>Decide which context/<module>.md to load for a task</td></tr>
+    <tr><td><strong>Keywords field</strong></td><td>Human reference — agent does NOT route from here</td><td>What the agent actually matches against</td></tr>
+    <tr><td><strong>Updated when</strong></td><td>New Gradle module added</td><td>New module added OR new context file created</td></tr>
+  </table>
+
+  <h3 id="mod-fields">Field breakdown — one entry per module</h3>
+  <table>
+    <tr><th>Field</th><th>Importance</th><th>What to write</th></tr>
+    <tr><td>Module name (header)</td><td><span class="tag-req">Required</span></td><td>Android: Gradle module name e.g. <code>:app/profile</code>. iOS: SPM target or Xcode group e.g. <code>AuthFeature</code>. Used as debt anchor — must match TECH_DEBT.md section header exactly.</td></tr>
+    <tr><td>Path</td><td><span class="tag-crit">Critical</span></td><td>Source path relative to <code>codebase_path</code>. Android: <code>app/src/main/java/…/profile/</code>. iOS: <code>Sources/AuthFeature/</code> or <code>MyApp/Features/Auth/</code>. Agent resolves all file reads from here. Must be exact.</td></tr>
+    <tr><td>Language</td><td><span class="tag-req">Required</span></td><td>Kotlin / Kotlin+Java / Java / Swift / Swift+ObjC / TypeScript. Tells agent which syntax and migration rules apply.</td></tr>
+    <tr><td>Pattern</td><td><span class="tag-req">Required</span></td><td>Android: MVVM / MVP / Infrastructure. iOS: MVVM / MVC / VIPER / TCA / Clean. Agent uses this to enforce architectural consistency.</td></tr>
+    <tr><td>DI</td><td><span class="tag-req">Required</span></td><td>Android: Hilt / Dagger / Manual. iOS: Manual / Resolver / Swinject / Factory / Needle. Determines instantiation pattern the agent uses for new classes.</td></tr>
+    <tr><td>Purpose</td><td><span class="tag-req">Required</span></td><td>One sentence: what the module does AND what it does NOT do. Boundaries prevent the agent loading this for unrelated tasks.</td></tr>
+    <tr><td>Keywords</td><td><span class="tag-opt">Optional</span></td><td>Human reference — copy these to context/_index.md for actual routing. Keep in sync but know routing happens in _index.md.</td></tr>
+    <tr><td>Key classes</td><td><span class="tag-crit">Critical</span></td><td>The 3–6 most important files. Agent reads these first when context/<module>.md doesn't exist yet. Blank = no fallback.</td></tr>
+    <tr><td>Depends on</td><td><span class="tag-req">Required</span></td><td>Other modules this imports. Helps agent understand import scope.</td></tr>
+    <tr><td>Context file</td><td><span class="tag-req">Required</span></td><td>Path to context/<module>.md. Agent loads this before source files.</td></tr>
+    <tr><td>Known debt</td><td><span class="tag-crit">Critical</span></td><td>Must be <code>TECH_DEBT.md#anchor-id</code> — the anchor must exist in TECH_DEBT.md exactly.</td></tr>
+  </table>
+
+  <h3>A complete module entry</h3>
+  <pre><code><span class="cm">### :app/profile — User Profile & Settings</span>
+
+<span class="hl">| Field | Value |</span>
+<span class="hl">|-------|-------|</span>
+<span class="ok">| Path | `app/src/main/java/com/[package]/views/profile/` |</span>
+<span class="ok">| Language | Kotlin |</span>
+<span class="ok">| Pattern | MVVM + Hilt |</span>
+<span class="ok">| DI | Hilt |</span>
+<span class="ok">| Purpose | Profile display/edit and settings screen.</span>
+<span class="ok">|         | Does NOT own checkout or guest account creation. |</span>
+<span class="yn">| Keywords | profile, settings, opt-in, promotional, marketing,</span>
+<span class="yn">|           [Profile]ViewModel, [Settings]Fragment |</span>
+<span class="ok">| Key classes | `[Profile]ViewModel.kt`, `[Profile]Fragment.kt`,</span>
+<span class="ok">|              `[Settings]Fragment.kt` |</span>
+<span class="ok">| Depends on | `:core` ([User]Repository), `:feature-api-sdk` |</span>
+<span class="ok">| Context file | `context/profile.md` |</span>
+<span class="ok">| Known debt | see `TECH_DEBT.md#profile` |</span></code></pre>
+
+  <div class="tip">
+    <div class="tip-icon">⚠️</div>
+    The <code>Known debt</code> anchor (<code>#profile</code>) must exactly match the section header in TECH_DEBT.md (<code>## :app/profile {#profile}</code>). A mismatch means the agent can't find the debt rules.
+  </div>
+
+  <h3 id="mod-mistakes">Common mistakes</h3>
+  <ul class="mistake-list">
+    <li>
+      <strong>Leaving Key classes blank</strong>
+      On day 1, before any context files exist, Key classes is the agent's only fallback for finding source files.
+      <span class="fix">Always list at least 3–4 key files. Use the files you'd look at first if asked to understand this module.</span>
+    </li>
+    <li>
+      <strong>Anchor ID mismatch with TECH_DEBT.md</strong>
+      <code>TECH_DEBT.md#profile</code> in MODULE_MAP but TECH_DEBT.md has <code>{#settings}</code>.
+      <span class="fix">Use the exact same ID in both files. Convention: lowercase module name with hyphens.</span>
+    </li>
+    <li>
+      <strong>Thinking keywords here route the agent</strong>
+      Developers add great keywords to MODULE_MAP but forget to copy them to <code>context/_index.md</code>.
+      <span class="fix">Add keywords to MODULE_MAP for human readability, then copy to <code>_index.md</code> for actual agent routing.</span>
+    </li>
+    <li>
+      <strong>Purpose says only what the module does — not what it doesn't</strong>
+      "Profile and settings" — agent might load this for checkout-related tasks.
+      <span class="fix">Always include "Does NOT own X" for the nearest related module. Boundaries prevent false routing.</span>
+    </li>
+  </ul>
+
+  <h3>Per-ticket checklist</h3>
+  <ul class="checklist">
+    <li>Task creates a new Gradle module → add a new entry at the bottom</li>
+    <li>Task reveals a new important class in an existing module → add to Key classes</li>
+    <li>New entry added → also add a row to <code>context/_index.md</code> and a section to <code>TECH_DEBT.md</code></li>
+  </ul>
+  <div class="update-freq">
+    <span class="freq-once">🟢 Populated once per module — then stable</span>
+    <span class="freq-rare">🔵 Updated only when a new Gradle module is added</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="techdebt" class="file-section">
+  <div class="file-header">
+    <div class="file-icon">🔧</div>
+    <div class="file-header-text">
+      <div class="filename">spec-kit/TECH_DEBT.md</div>
+      <h2>Tech Debt Register</h2>
+      <p>Known debt by module with status (OPEN / SCHEDULED / RESOLVED) and precise agent rules per entry. Agent loads only sections for modules the current task touches.</p>
+      <span class="who-badge team">✦ Team writes</span>
+      <span class="when-badge">Updated when debt is confirmed, scheduled, or resolved</span>
+    </div>
+  </div>
+
+  <div class="callout callout-red">
+    <strong>The Agent rule field is the most critical part of every debt entry.</strong> It must be an exact instruction — not a description of the problem. The agent reads the rule and follows it literally.
+  </div>
+
+  <h3 id="debt-fields">Field breakdown</h3>
+  <table>
+    <tr><th>Field</th><th>Importance</th><th>What to write</th></tr>
+    <tr><td>Section header + anchor</td><td><span class="tag-crit">Critical</span></td><td>Must match MODULE_MAP.md Known debt link exactly. e.g. <code>## :app/profile {#profile}</code></td></tr>
+    <tr><td>Debt title</td><td><span class="tag-req">Required</span></td><td>One-line description: DEBT-001 — [what the debt is]. Auto-increment IDs.</td></tr>
+    <tr><td>Status</td><td><span class="tag-req">Required</span></td><td>OPEN / SCHEDULED / RESOLVED. Agent skips RESOLVED entries.</td></tr>
+    <tr><td>Location</td><td><span class="tag-req">Required</span></td><td>Exact file path(s) — <code>path/to/File.kt:L42</code> if line-specific. Agent uses this to identify affected code.</td></tr>
+    <tr><td>Impact</td><td><span class="tag-opt">Optional</span></td><td>Why this is a problem — for human readers. Agent uses Agent rule, not this.</td></tr>
+    <tr><td><strong>Agent rule</strong></td><td><span class="tag-crit">Critical</span></td><td>Exact instruction for the agent. Must be actionable. See examples below.</td></tr>
+    <tr><td>Scheduled ticket</td><td><span class="tag-opt">Optional</span></td><td>Ticket ID if SCHEDULED. Helps humans see what's already tracked.</td></tr>
+  </table>
+
+  <h3 id="debt-agent-rule">Writing effective Agent rules</h3>
+
+  <div class="compare">
+    <div class="compare-col bad-col">
+      <h4>❌ Impact description — not an instruction</h4>
+      <pre><code><span class="bad">| Agent rule | This ViewModel uses LiveData
+|            | which makes testing harder.
+|            | The code is messy and should
+|            | be cleaned up eventually. |</span></code></pre>
+      <p>The agent doesn't know what to do or not do. It may try to "clean up" the ViewModel.</p>
+    </div>
+    <div class="compare-col good-col">
+      <h4>✅ Exact instruction — agent knows what to do</h4>
+      <pre><code><span class="ok">| Agent rule | Do not add new LiveData to
+|            | ProfileViewModel. New state
+|            | added by this task must use
+|            | MutableStateFlow. Do not
+|            | migrate existing LiveData
+|            | in this task. |</span></code></pre>
+    </div>
+  </div>
+
+  <h3>A complete debt entry</h3>
+  <pre><code><span class="cm">## :app/profile {#profile}</span>
+
+<span class="cm">### DEBT-001 — ProfileViewModel uses LiveData for legacy state</span>
+
+<span class="hl">| Field | Value |</span>
+<span class="hl">|-------|-------|</span>
+<span class="ok">| Status | OPEN |</span>
+<span class="ok">| Location | `app/.../profile/ProfileViewModel.kt` |</span>
+<span class="ok">| Impact | LiveData-based state cannot be tested without |</span>
+<span class="ok">|        | Android instrumentation tests. |</span>
+<span class="ok">| Agent rule | Do not add new LiveData fields to ProfileViewModel. |</span>
+<span class="ok">|            | Any new state added in this task uses MutableStateFlow. |</span>
+<span class="ok">|            | Do not migrate existing _user or _paymentMethods |</span>
+<span class="ok">|            | LiveData — that is scoped to TICKET-450. |</span>
+<span class="ok">| Scheduled ticket | TICKET-450 |</span></code></pre>
+
+  <h3>Anchor IDs must match MODULE_MAP</h3>
+  <div class="compare">
+    <div class="compare-col bad-col">
+      <h4>❌ Anchor mismatch — link is broken</h4>
+      <pre><code><span class="bad"># MODULE_MAP.md
+| Known debt | see TECH_DEBT.md#profile |
+
+# TECH_DEBT.md
+## :app/profile {#settings}  ← wrong anchor</span></code></pre>
+    </div>
+    <div class="compare-col good-col">
+      <h4>✅ Anchors match — agent finds the rules</h4>
+      <pre><code><span class="ok"># MODULE_MAP.md
+| Known debt | see TECH_DEBT.md#profile |
+
+# TECH_DEBT.md
+## :app/profile {#profile}  ← matches exactly</span></code></pre>
+    </div>
+  </div>
+
+  <h3 id="debt-mistakes">Common mistakes</h3>
+  <ul class="mistake-list">
+    <li>
+      <strong>Writing impact descriptions instead of agent rules</strong>
+      "This causes performance issues" vs "Do not call X from the UI thread — use Y instead."
+      <span class="fix">Always write Agent rule as an imperative: "Do not...", "Use X instead of Y", "Always call Z before..."</span>
+    </li>
+    <li>
+      <strong>Not adding new debt found during task completion</strong>
+      Agent reports new debt in the completion report. Humans review and decide — but it often doesn't get added.
+      <span class="fix">Make reviewing "Follow-up recommended" in the completion report a PR review step. Add entries here when confirmed.</span>
+    </li>
+    <li>
+      <strong>Anchor ID mismatch with MODULE_MAP</strong>
+      The link in MODULE_MAP points to a non-existent section.
+      <span class="fix">After adding a new module entry in MODULE_MAP, immediately add its section in TECH_DEBT.md with matching anchor.</span>
+    </li>
+  </ul>
+
+  <h3>Per-ticket checklist</h3>
+  <ul class="checklist">
+    <li>Completion report lists new debt → review and add to relevant module section</li>
+    <li>Debt was resolved in this task → move entry to Resolved section with resolution notes</li>
+    <li>New module added → add its section header and anchor immediately (even if "No known debt")</li>
+  </ul>
+  <div class="update-freq">
+    <span class="freq-ticket">🟡 Review after every task completion report</span>
+    <span class="freq-rare">🔵 Major entries when debt is explicitly tackled</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="testing" class="file-section">
+  <div class="file-header">
+    <div class="file-icon">🧪</div>
+    <div class="file-header-text">
+      <div class="filename">spec-kit/TESTING.md</div>
+      <h2>Testing Standards</h2>
+      <p>Test framework, ViewModel/feature pattern, mocking rules, coverage targets. <strong>Android:</strong> MockK + Turbine + MainDispatcherRule. <strong>iOS:</strong> XCTest / Swift Testing + async/await + @MainActor + protocol mocks. Loaded when any task requires tests.</p>
+      <span class="who-badge tech-lead">✦ Tech lead writes</span>
+      <span class="when-badge">Updated when framework or approach changes</span>
+    </div>
+  </div>
+
+  <div class="callout callout-yellow">
+    <strong>The naming convention here is enforced by the Quality Gate in CONVENTIONS.md on every task.</strong> If tests don't follow <code>functionName_scenario_expectedResult</code>, the agent's self-verification step will flag them — and the agent will rewrite them.
+  </div>
+
+  <h3>Sections to fill in</h3>
+  <table>
+    <tr><th>Section</th><th>Importance</th><th>What to write</th></tr>
+    <tr><td>Framework Stack table</td><td><span class="tag-crit">Critical</span></td><td>Library + version for every test dependency. Agent uses exact library names for imports and patterns.</td></tr>
+    <tr><td>What to test / not test</td><td><span class="tag-req">Required</span></td><td>Layers that require tests. What's explicitly excluded. Prevents the agent writing tests for Android framework classes.</td></tr>
+    <tr><td>Naming convention</td><td><span class="tag-crit">Critical</span></td><td>Enforced by Quality Gate. Must be exactly <code>functionName_scenario_expectedResult</code> or your team's equivalent.</td></tr>
+    <tr><td>ViewModel test pattern</td><td><span class="tag-crit">Critical</span></td><td>Full working example with MainDispatcherRule, mockk setup, runTest, Turbine. Agent copies this pattern exactly.</td></tr>
+    <tr><td>Flow / StateFlow testing</td><td><span class="tag-req">Required</span></td><td>Turbine vs advanceUntilIdle — when to use each. No Thread.sleep. No runBlocking.</td></tr>
+    <tr><td>Mocking rules</td><td><span class="tag-req">Required</span></td><td>MockK only, mock interfaces not data classes, coEvery for suspend, verify only for side effects.</td></tr>
+    <tr><td>Coverage targets</td><td><span class="tag-opt">Optional</span></td><td>% per layer for new code. Agent uses these to determine when "enough" tests have been written.</td></tr>
+  </table>
+
+  <h3 id="test-naming">Naming convention — the most critical rule</h3>
+
+  <div class="compare">
+    <div class="compare-col bad-col">
+      <h4>❌ Vague names — Quality Gate fails</h4>
+      <pre><code><span class="bad">@Test fun testLogin()
+@Test fun shouldWork()
+@Test fun loginTest()
+@Test fun verifyEmailValidation()</span></code></pre>
+    </div>
+    <div class="compare-col good-col">
+      <h4>✅ Three-part names — verifiable, searchable</h4>
+      <pre><code><span class="ok">@Test
+fun onLoginClicked_withInvalidEmail_showsEmailError()
+
+@Test
+fun onLoginClicked_withValidCredentials_emitsNavigateToHome()
+
+@Test
+fun loadUser_whenNetworkFails_returnsErrorState()
+
+@Test
+fun updateOptIn_withTrueValue_callsEngageManagerNotRepository()</span></code></pre>
+    </div>
+  </div>
+
+  <h3 id="test-pattern">The ViewModel test pattern — copy exactly</h3>
+  <p>This is the pattern the agent uses for every ViewModel test. Include a real, working example so the agent copies the right structure.</p>
+
+  <pre><code><span class="cm">class [Feature]ViewModelTest {</span>
+
+    <span class="ok">@get:Rule</span>
+    <span class="ok">val mainDispatcherRule = MainDispatcherRule()</span>
+    <span class="cm">// ↑ Required — sets Dispatchers.Main to TestDispatcher</span>
+
+    <span class="ok">private val [dependency]: [Interface] = mockk()</span>
+    <span class="cm">// ↑ Always mock the interface, not the implementation</span>
+
+    <span class="ok">private lateinit var viewModel: [Feature]ViewModel</span>
+
+    <span class="ok">@Before fun setUp() {</span>
+    <span class="ok">    viewModel = [Feature]ViewModel([dependency])</span>
+    <span class="ok">}</span>
+
+    <span class="cm">// SharedFlow / Channel — use Turbine</span>
+    <span class="ok">@Test</span>
+    <span class="ok">fun `[method]_[scenario]_[result]`() = runTest {</span>
+    <span class="ok">    coEvery { [dependency].[method](any()) } returns Result.success([value])</span>
+    <span class="ok">    viewModel.navigationEvent.test {</span>
+    <span class="ok">        viewModel.processIntent([Intent])</span>
+    <span class="ok">        assertThat(awaitItem()).isEqualTo([expected])</span>
+    <span class="ok">        cancelAndIgnoreRemainingEvents()</span>
+    <span class="ok">    }</span>
+    <span class="ok">}</span>
+
+    <span class="cm">// StateFlow — use advanceUntilIdle + .value</span>
+    <span class="ok">@Test</span>
+    <span class="ok">fun `[method]_[scenario]_[result]`() = runTest {</span>
+    <span class="ok">    coEvery { [dependency].[method](any()) } returns Result.failure(Exception("error"))</span>
+    <span class="ok">    viewModel.processIntent([Intent])</span>
+    <span class="ok">    advanceUntilIdle()</span>
+    <span class="ok">    assertThat(viewModel.uiState.value.errorMessage).isNotNull()</span>
+    <span class="ok">}</span>
+<span class="cm">}</span></code></pre>
+
+  <h3 id="test-mistakes">Common mistakes</h3>
+  <ul class="mistake-list">
+    <li>
+      <strong>Not specifying Turbine vs advanceUntilIdle — the agent picks one randomly</strong>
+      SharedFlow/Channel events need Turbine. StateFlow assertions need advanceUntilIdle. If not specified, the agent mixes them.
+      <span class="fix">Explicitly document: "Use Turbine for SharedFlow/Channel. Use advanceUntilIdle() for StateFlow assertions."</span>
+    </li>
+    <li>
+      <strong>Mocking data classes</strong>
+      <code>private val user: User = mockk()</code> — data classes should be created with real values.
+      <span class="fix">Write explicitly: "Never mock data classes. Create them with real test values: <code>User(id = "1", email = "test@test.com")</code>"</span>
+    </li>
+    <li>
+      <strong>Missing MainDispatcherRule in the pattern</strong>
+      Without this, tests using <code>viewModelScope</code> fail with <code>Module with the Main dispatcher had failed to initialize</code>.
+      <span class="fix">Include MainDispatcherRule in the pattern example — it must be the first thing in every ViewModel test class.</span>
+    </li>
+    <li>
+      <strong>Leaving coverage targets blank</strong>
+      Agent doesn't know when "enough" tests are written.
+      <span class="fix">Set targets per layer: ViewModel 80%, UseCase 90%, Repository 70%. These apply to code written in the task only.</span>
+    </li>
+  </ul>
+
+  <h3>Per-ticket checklist</h3>
+  <ul class="checklist">
+    <li>Task adds a new framework dependency (e.g. MockWebServer) → add to Framework Stack table</li>
+    <li>Team changes mocking library (Mockito → MockK) → update Mocking rules and examples</li>
+    <li>Team changes coverage targets → update Coverage Expectations table</li>
+  </ul>
+  <div class="update-freq">
+    <span class="freq-once">🟢 Set up once during onboarding</span>
+    <span class="freq-rare">🔵 Updated when framework or approach changes</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="datamodel" class="file-section">
+  <div class="file-header">
+    <div class="file-icon">🗄️</div>
+    <div class="file-header-text">
+      <div class="filename">spec-kit/DATA_MODEL.md</div>
+      <h2>Data Model</h2>
+      <p>Domain entities, API contracts with request/response shapes, and field-level notes. Loaded when a task touches network, DB, or data models.</p>
+      <span class="who-badge data-owner">✦ Data / backend owner writes</span>
+      <span class="when-badge">Updated when new endpoints or domain entities are introduced</span>
+    </div>
+  </div>
+
+  <div class="callout callout-red">
+    <strong>The mapping direction is non-negotiable:</strong> Network DTO → Domain model → UI model. Never skip a layer. Never expose a DTO to the ViewModel or Fragment. This rule is enforced by the Quality Gate.
+  </div>
+
+  <h3 id="dm-mapping">Mapping conventions — the most important rule</h3>
+
+  <div class="compare">
+    <div class="compare-col bad-col">
+      <h4>❌ DTO passed to ViewModel — banned</h4>
+      <pre><code><span class="bad">// Fragment reads raw API response field
+binding.switch.isChecked =
+    response.data.user.emailMarketingOptIn
+
+// ViewModel exposes DTO
+val userData: StateFlow&lt;ApiResponse&gt;</span></code></pre>
+    </div>
+    <div class="compare-col good-col">
+      <h4>✅ Three-layer mapping — correct</h4>
+      <pre><code><span class="ok">// Layer 1: Repository maps DTO → domain
+data class UserPreferences(
+    val emailOptIn: Boolean = false,
+    val zipcode: String? = null
+)
+
+// Layer 2: ViewModel exposes domain model
+val preferences: StateFlow&lt;UserPreferences&gt;
+
+// Layer 3: Fragment observes domain model
+viewModel.preferences.collect { prefs ->
+    binding.switch.isChecked = prefs.emailOptIn
+}</span></code></pre>
+    </div>
+  </div>
+
+  <h3 id="dm-endpoints">Writing an endpoint entry</h3>
+  <p>Each endpoint needs: method + path, who calls it, request JSON, response JSON, field table, and any Agent notes.</p>
+
+  <pre><code><span class="cm">#### POST /user/preferences</span>
+
+<span class="ok">**Used by:** `[Feature]Service.getUserData()` → `[Feature]Repository.getUserInfo()`</span>
+
+<span class="cm">Request:</span>
+<span class="hl">{</span>
+<span class="hl">  "access_token": "string",</span>
+<span class="hl">  "identifiers": { "email": "string" }</span>
+<span class="hl">}</span>
+
+<span class="cm">Response 200:</span>
+<span class="hl">{</span>
+<span class="hl">  "success": true,</span>
+<span class="hl">  "data": {</span>
+<span class="hl">    "user": {</span>
+<span class="ok">      "email_marketing_opt_in": true,</span>
+<span class="hl">      "zipcode": "10001",</span>
+<span class="hl">      "birth_month": 6,</span>
+<span class="hl">      "birth_day": 15</span>
+<span class="hl">    }</span>
+<span class="hl">  }</span>
+<span class="hl">}</span>
+
+<span class="hl">| Field | Kotlin property | Notes |</span>
+<span class="hl">|-------|----------------|-------|</span>
+<span class="ok">| data.user.email_marketing_opt_in | UserPreferences.emailOptIn | Authoritative source — use this, NOT [LegacyApi].optin |</span>
+<span class="hl">| data.user.zipcode | UserPreferences.zipcode | Nullable — shown in profile edit |</span>
+<span class="hl">| data.user.birth_month | — | Combined with birth_day to form "MM/DD" |</span>
+
+<span class="ok">Mapped in: `[module]/.../network/responses/[Feature]Response.kt`</span>
+
+<span class="yn">&gt; **Agent note:** emailOptIn is NOT yet in [RequestBody].Fields.</span>
+<span class="yn">&gt; Add as `@SerializedName("email_marketing_opt_in") val emailOptIn: Boolean? = null`.</span>
+<span class="yn">&gt; Nullable so existing callers that don't set it are unaffected.</span></code></pre>
+
+  <h3>The "already exists" vs "must be added" distinction</h3>
+  <p>This is the most valuable thing you can document in a field table — it prevents the agent from either duplicating existing fields or skipping fields that need to be added.</p>
+
+  <table>
+    <tr><th>Note to write</th><th>When to use it</th></tr>
+    <tr><td><code>Already exists</code></td><td>Field is in the data class — agent must NOT re-declare it</td></tr>
+    <tr><td><code>Must be added — does not exist yet</code></td><td>Field is needed by the task but missing from the data class</td></tr>
+    <tr><td><code>Authoritative source — use this, NOT [X]</code></td><td>Two sources exist for the same data; one is correct and one is stale</td></tr>
+    <tr><td><code>Not currently used in UI — do not add</code></td><td>Field exists in API but is out of scope for the current task</td></tr>
+  </table>
+
+  <h3 id="dm-mistakes">Common mistakes</h3>
+  <ul class="mistake-list">
+    <li>
+      <strong>Putting base URLs and auth here instead of ARCHITECTURE.md</strong>
+      DATA_MODEL is for data shapes. Infrastructure config belongs in ARCHITECTURE.md under Networking.
+      <span class="fix">Add a note at the top: "Base URLs and auth mechanism live in ARCHITECTURE.md under Networking."</span>
+    </li>
+    <li>
+      <strong>Documenting only the response — not the request body</strong>
+      For write endpoints, the agent needs the request body shape to know what fields to include.
+      <span class="fix">Always document both request and response for write endpoints. Read-only endpoints can have request only.</span>
+    </li>
+    <li>
+      <strong>No Agent note for ambiguous fields</strong>
+      Two APIs return <code>optin</code> — which one is authoritative? Without a note, the agent picks whichever it reads first.
+      <span class="fix">Add Agent note blocks for any field with a gotcha: wrong source, missing implementation, nullable assumption.</span>
+    </li>
+    <li>
+      <strong>Not documenting the Kotlin property name alongside the JSON field name</strong>
+      <code>email_marketing_opt_in</code> (JSON) → <code>emailMarketingOptIn</code> (Kotlin) — the agent needs both.
+      <span class="fix">Use the field table format: JSON field → Kotlin property → Notes. Always include both names.</span>
+    </li>
+  </ul>
+
+  <h3 id="dm-brownfield">Brownfield approach — documenting what already exists</h3>
+
+  <div class="callout callout-yellow">
+    <strong>Brownfield starting point is different.</strong> In greenfield, you design the data model before writing code. In brownfield, DTOs exist across 40 files you haven't fully read, domain models may not be separate from DTOs, and some mappings are workarounds that are now load-bearing. Don't try to document everything on day 1 — write a stale spec and the agent will trust wrong information.
+  </div>
+
+  <p><strong>The strategy: document by blast radius, not by completeness.</strong> Capture the models the agent is most likely to touch incorrectly — not all models.</p>
+
+  <h4 style="margin: 20px 0 8px; font-size: 14px; color: var(--text);">Tier 1 — Document immediately (before any tickets run)</h4>
+  <p style="margin-bottom:12px">Anti-patterns that already exist — the agent needs to know "don't fix these."</p>
+
+  <pre><code><span class="cm">## Known Mapping Anti-Patterns</span>
+
+<span class="bad">### [UserProfile] — DTO leaked to UI layer</span>
+<span class="hl">- `[UserProfileDto]` is used directly in `[ProfileViewModel]`</span>
+<span class="hl">- **Agent rule:** Do NOT add new fields directly from DTO to ViewModel.</span>
+<span class="hl">  Map through `[UserProfileMapper]` first.</span>
+<span class="yn">- **Do NOT fix the existing leak** — out of scope until [PROJ]-XXX</span>
+
+<span class="bad">### [OrderResponse] — nullable fields assumed non-null</span>
+<span class="hl">- `orderId` is nullable in API contract but UI force-unwraps via `!!`</span>
+<span class="hl">- **Agent rule:** Any new code reading `orderId` must null-check.</span>
+<span class="hl">  Do not add `!!`.</span></code></pre>
+
+  <p>Also add the mapping direction for each active area — even one line prevents the most common mistake:</p>
+
+  <pre><code><span class="cm">## Mapping Direction (non-negotiable)</span>
+
+<span class="ok">Network → Domain → UI</span>
+<span class="hl">- [ApiResponse] → [DomainModel] via [FeatureMapper]</span>
+<span class="hl">- [DomainModel] → [UiState] in ViewModel — never in Fragment/Composable</span></code></pre>
+
+  <h4 style="margin: 20px 0 8px; font-size: 14px; color: var(--text);">Tier 2 — Document as you touch each area (per-ticket)</h4>
+  <p style="margin-bottom:12px">When a ticket touches an endpoint, add its entry then. DATA_MODEL grows from real discoveries, not guesses.</p>
+
+  <pre><code><span class="cm">## API Contracts</span>
+
+<span class="cm">### [endpoint] — added [PROJ]-123, [date]</span>
+<span class="hl">- Method: POST</span>
+<span class="hl">- Request: [RequestBody]</span>
+<span class="hl">- Response: [ApiResponse]</span>
+<span class="hl">- Domain mapping: [ApiResponse] → [DomainModel] via [Mapper]</span>
+<span class="yn">- Known issues: `phoneNumber` absent in staging — default to empty string</span></code></pre>
+
+  <h4 style="margin: 20px 0 8px; font-size: 14px; color: var(--text);">Tier 3 — Document only if the agent needs it</h4>
+  <p>Domain entity definitions are only worth adding when:</p>
+  <ul style="margin: 8px 0 16px; padding-left: 20px; color: var(--text-muted);">
+    <li>The entity has a non-obvious structure (embedded objects, discriminated unions)</li>
+    <li>Two modules write to the same entity with different assumptions</li>
+    <li>The field source is ambiguous — two APIs return it, one is authoritative</li>
+  </ul>
+
+  <h4 style="margin: 20px 0 8px; font-size: 14px; color: var(--text);">What to put in DATA_MODEL.md on day 1</h4>
+
+  <pre><code><span class="cm"># DATA_MODEL.md</span>
+
+<span class="cm">## Mapping Conventions</span>
+<span class="hl">Network → Domain → UI. No skipping layers.</span>
+<span class="hl">- DTOs live in `:core-network`. Never referenced outside that module.</span>
+<span class="hl">- Domain models live in `:core-domain`. ViewModels consume these only.</span>
+<span class="hl">- UI models (if needed) are created in the feature module.</span>
+
+<span class="cm">## Known Anti-Patterns (do not fix unless ticket explicitly says so)</span>
+<span class="hl">[List violations found during bootstrap scan]</span>
+
+<span class="cm">## API Contracts</span>
+<span class="yn">[Empty on day 1 — populate per ticket as endpoints are touched]</span>
+
+<span class="cm">## Domain Entities</span>
+<span class="yn">[Empty on day 1 — populate when an entity's structure would confuse the agent]</span></code></pre>
+
+  <div class="callout callout-blue">
+    <strong>Empty sections with comments are deliberate.</strong> They signal to the agent "this area is undocumented, tread carefully" — not "this area doesn't exist." Without the section headers, the agent assumes it can do whatever it infers from source files.
+  </div>
+
+  <div class="compare">
+    <div class="compare-col bad-col">
+      <h4>❌ Complete API inventory on day 1</h4>
+      <ul>
+        <li>Wrong immediately — you'll misremember field names</li>
+        <li>Stale within a week as fields change</li>
+        <li>Never read — too long, no signal-to-noise</li>
+        <li>Agent trusts wrong data over source files</li>
+      </ul>
+    </div>
+    <div class="compare-col good-col">
+      <h4>✅ Grow by blast radius</h4>
+      <ul>
+        <li>Day 1: mapping direction + known anti-patterns only</li>
+        <li>Per ticket: add each endpoint as you touch it</li>
+        <li>Always accurate — written from live code, not memory</li>
+        <li>Agent gets signal exactly where it needs it</li>
+      </ul>
+    </div>
+  </div>
+
+  <h4 style="margin: 20px 0 8px; font-size: 14px; color: var(--text);">Brownfield maintenance contract</h4>
+  <table>
+    <tr><th>Event</th><th>What to add</th></tr>
+    <tr><td>New endpoint added</td><td>Full endpoint entry</td></tr>
+    <tr><td>Existing endpoint touched</td><td>Add entry if missing; add "Known issues" if a gotcha was found</td></tr>
+    <tr><td>New DTO-to-domain mapping written</td><td>Document the mapper class and direction</td></tr>
+    <tr><td>Agent makes a mapping mistake</td><td>Add an explicit Agent rule to prevent recurrence</td></tr>
+    <tr><td>Tech debt discovered (DTO leak, null assumption)</td><td>Add to Known Anti-Patterns with "do not fix" note</td></tr>
+  </table>
+
+  <h3>Per-ticket checklist</h3>
+  <ul class="checklist">
+    <li>Task calls a new API endpoint → add a full section (method, request, response, field table)</li>
+    <li>Task adds a new field to an existing request body → add a row with "Must be added" note</li>
+    <li>Task introduces a new domain entity → add it to the Domain Entities section</li>
+    <li>Task replaces one data source with another → add "Authoritative source — use this, NOT X" note</li>
+    <li>Brownfield: task touches an area with a known anti-pattern → verify the anti-pattern is in Known Anti-Patterns before running the ticket</li>
+    <li>Existing endpoint already documented → no change needed</li>
+  </ul>
+  <div class="update-freq">
+    <span class="freq-ticket">🟡 Updated for tasks involving new endpoints or data model changes</span>
+    <span class="freq-rare">🔵 Stable for UI-only or business logic tasks</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="index" class="file-section">
+  <div class="file-header">
+    <div class="file-icon">🗂️</div>
+    <div class="file-header-text">
+      <div class="filename">context/_index.md</div>
+      <h2>Context Index</h2>
+      <p>The authoritative keyword routing table. The agent matches task keywords here to decide which context/&lt;module&gt;.md files to load. If a module isn't here, its context file is never loaded.</p>
+      <span class="who-badge team">✦ Team writes — grows over time</span>
+      <span class="when-badge">Updated whenever a new module or context file is added</span>
+    </div>
+  </div>
+
+  <div class="callout callout-red">
+    <strong>This is the single most critical file for routing accuracy.</strong> MODULE_MAP.md has keywords too — but only this file is used by the agent for routing. If your module's keywords aren't in the Keyword Routing Table here, the agent will never load its context file.
+  </div>
+
+  <h3 id="index-vs-modulemap">_index.md vs MODULE_MAP.md — the split explained</h3>
+
+  <div class="compare">
+    <div class="compare-col">
+      <h4>context/_index.md — routing</h4>
+      <ul>
+        <li>Lightweight keyword → context file table</li>
+        <li>Read by the agent on every task to decide what to load</li>
+        <li>Contains ONLY keywords and context file paths</li>
+        <li>Must be comprehensive — all possible ways a module appears in tickets</li>
+        <li>Updated when a new module/context file is added</li>
+      </ul>
+    </div>
+    <div class="compare-col">
+      <h4>MODULE_MAP.md — registry</h4>
+      <ul>
+        <li>Rich metadata — path, pattern, DI, key classes, debt anchor</li>
+        <li>Read after routing for source paths and fallback files</li>
+        <li>Contains full module description</li>
+        <li>Keywords field is human reference — not used for routing</li>
+        <li>Updated when a new Gradle module is added</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 id="index-keywords">Writing good keywords</h3>
+  <p>Keywords must cover all the ways a module appears in ticket descriptions — feature names, class names, domain terms, UI labels, API terms.</p>
+
+  <div class="compare">
+    <div class="compare-col bad-col">
+      <h4>❌ Too few / too generic — misses matches</h4>
+      <pre><code><span class="bad">| user, settings | Profile | context/profile.md |</span></code></pre>
+      <p>A ticket saying "fix AppSettingsFragment promotional switch" won't match — no class names.</p>
+      <p>A ticket saying "update opt-in status" won't match — no domain terms.</p>
+    </div>
+    <div class="compare-col good-col">
+      <h4>✅ Comprehensive — matches from any angle</h4>
+      <pre><code><span class="ok">| profile, settings, account,
+  opt-in, optin, promotional,
+  email marketing, contact options,
+  [Profile]ViewModel, [Settings]Fragment,
+  EditProfileDialog
+| Profile / Settings | context/profile.md |</span></code></pre>
+      <p>Matches: feature names, domain terms, class names, UI label names, API-adjacent terms.</p>
+    </div>
+  </div>
+
+  <h3>A complete routing table</h3>
+  <pre><code><span class="cm">## Keyword Routing Table</span>
+
+<span class="hl">| Keywords | Module | Context File |</span>
+<span class="hl">|----------|--------|--------------|</span>
+<span class="ok">| login, logout, sign in, sign out, session, token,</span>
+<span class="ok">  auth, biometric, password, register | Authentication | `context/auth.md` |</span>
+<span class="ok">| profile, settings, account, opt-in, optin,</span>
+<span class="ok">  promotional, email marketing,</span>
+<span class="ok">  [Profile]ViewModel, [Settings]Fragment | Profile | `context/profile.md` |</span>
+<span class="ok">| checkout, order, basket, submit, guest,</span>
+<span class="ok">  create account, sign up | Checkout | `context/checkout.md` |</span>
+<span class="ok">| analytics, tracking, firebase, event,</span>
+<span class="ok">  screen view, [Analytics]Tracker | Analytics | `context/analytics.md` |</span>
+<span class="ok">| network, API, http, retrofit, endpoint,</span>
+<span class="ok">  interceptor, base url | Core Network | `context/core-network.md` |</span></code></pre>
+
+  <h3>When two modules share keywords</h3>
+  <div class="tip">
+    <div class="tip-icon">💡</div>
+    If two modules share a keyword (e.g. both "profile" and "settings" modules care about "opt-in"), add two rows — one for each. The agent loads ALL matching context files for a task.
+  </div>
+
+  <h3 id="index-mistakes">Common mistakes</h3>
+  <ul class="mistake-list">
+    <li>
+      <strong>Adding keywords to MODULE_MAP.md but forgetting _index.md</strong>
+      MODULE_MAP keywords are never read for routing. The agent only routes from this file.
+      <span class="fix">When you fill in MODULE_MAP keywords, immediately copy them here. The setup wizard does this automatically — use it.</span>
+    </li>
+    <li>
+      <strong>Using only feature names, no class names</strong>
+      Developers often write ticket descriptions with class names: "Fix issue in ProfileViewModel". Without class names in keywords, this doesn't match.
+      <span class="fix">Include 2–4 class names from the module as keywords — especially ViewModel and Fragment names.</span>
+    </li>
+    <li>
+      <strong>Not updating when a new context file is created</strong>
+      Agent generates context/checkout.md after a task, but no routing row exists. Next task on checkout falls back to source file scanning.
+      <span class="fix">Every new context file needs a row here. The agent adds a note in the completion report — act on it.</span>
+    </li>
+    <li>
+      <strong>Overly narrow keywords that miss synonyms</strong>
+      "opt-in" but not "optin", "email subscription", "marketing preference", "promotional emails".
+      <span class="fix">Think about all the words your team and PMs use in Jira/Linear tickets for this module. Include all variants.</span>
+    </li>
+  </ul>
+
+  <h3>Per-ticket checklist</h3>
+  <ul class="checklist">
+    <li>Task generates a new context file (bootstrap or first task on a module) → add a routing row immediately</li>
+    <li>Task introduces a new class name that will appear in future ticket descriptions → add class name to keywords</li>
+    <li>Task reveals that the agent loaded the wrong module (keyword false match) → narrow the keywords for the wrong module</li>
+  </ul>
+  <div class="update-freq">
+    <span class="freq-once">🟢 Seeded during setup with common modules</span>
+    <span class="freq-ticket">🟡 Updated when new context files are created</span>
+  </div>
+</section>
+
+</main>
+
+<footer class="app-footer">
+  <span>🔒 Confidential</span>
+  <span class="footer-sep">|</span>
+  <span class="footer-brand">Bounteous</span>
+</footer>
+
+<script>
+// Scrollspy
+const sections = document.querySelectorAll('[id]');
+const navLinks = document.querySelectorAll('nav a');
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      navLinks.forEach(l => l.classList.remove('active'));
+      const link = document.querySelector(`nav a[href="#${entry.target.id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agentic AI Development — A Practical Guide</title>
+<style>
+  :root {
+    --bg:         #0b111c;
+    --surface:    #0f1825;
+    --surface2:   #162033;
+    --border:     #1e2e47;
+    --accent:     #38bdf8;
+    --accent-dim: rgba(56,189,248,0.12);
+    --accent2:    #818cf8;
+    --green:      #3fb950;
+    --green-dim:  #0d2b17;
+    --yellow:     #d29922;
+    --yellow-dim: #2b2005;
+    --red:        #f85149;
+    --red-dim:    #2b0d0d;
+    --purple:     #bc8cff;
+    --purple-dim: #1e1040;
+    --text:       #e8eaf2;
+    --text-muted: #9ba3be;
+    --text-dim:   #647090;
+    --mono:       'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --sans:       -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --radius:     8px;
+    --nav-w:      260px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.7;
+    display: flex;
+  }
+
+  /* ── Sidebar ── */
+  nav {
+    width: var(--nav-w);
+    height: 100vh;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    position: fixed;
+    top: 0; left: 0;
+    overflow-y: auto;
+    padding: 24px 0 40px;
+    z-index: 100;
+  }
+
+  .nav-logo {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .nav-logo .badge {
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    display: inline-block;
+    margin-bottom: 8px;
+  }
+  .nav-logo h1 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.3;
+  }
+
+  .nav-section {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 12px 20px 4px;
+  }
+
+  nav a {
+    display: block;
+    padding: 6px 20px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 13px;
+    border-left: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  nav a:hover { color: var(--text); background: var(--surface2); }
+  nav a.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-dim); }
+
+  nav a.sub {
+    padding-left: 32px;
+    font-size: 12px;
+  }
+
+  /* ── Main content ── */
+  main {
+    margin-left: var(--nav-w);
+    max-width: 860px;
+    padding: 60px 52px;
+    width: 100%;
+  }
+
+  /* ── Sections ── */
+  section { margin-bottom: 80px; }
+
+  h2 {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+    padding-top: 8px;
+  }
+  h2 .section-num {
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 4px;
+    font-family: var(--mono);
+  }
+
+  h3 {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 32px 0 12px;
+  }
+
+  h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 24px 0 10px;
+  }
+
+  p { margin-bottom: 14px; color: var(--text-muted); }
+  p strong { color: var(--text); }
+
+  .lead {
+    font-size: 17px;
+    color: var(--text-muted);
+    line-height: 1.8;
+    margin-bottom: 28px;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    background: linear-gradient(135deg, var(--accent-dim) 0%, var(--purple-dim) 100%);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 40px;
+    margin-bottom: 60px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(88,166,255,0.12) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .hero .tag {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+  .hero h1 {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1.2;
+    margin-bottom: 16px;
+  }
+  .hero p {
+    font-size: 16px;
+    color: var(--text-muted);
+    max-width: 580px;
+    margin-bottom: 0;
+  }
+
+  /* ── Callouts ── */
+  .callout {
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-size: 14px;
+    border-left: 3px solid;
+  }
+  .callout-blue  { background: var(--accent-dim);  border-color: var(--accent);  color: #e0f2fe; }
+  .callout-green { background: var(--green-dim);   border-color: var(--green);   color: #a3e8b0; }
+  .callout-yellow{ background: var(--yellow-dim);  border-color: var(--yellow);  color: #f0d080; }
+  .callout-red   { background: var(--red-dim);     border-color: var(--red);     color: #ffa8a3; }
+  .callout strong { color: inherit; }
+
+  /* ── Tables ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px;
+    font-size: 13.5px;
+  }
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    background: var(--surface2);
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+    vertical-align: top;
+  }
+  td strong { color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+
+  /* ── Code ── */
+  pre {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    overflow-x: auto;
+    margin: 16px 0 24px;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  code {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: var(--surface2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--accent);
+    border: 1px solid var(--border);
+  }
+  pre code {
+    background: none;
+    padding: 0;
+    border: none;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+  .kw  { color: #ff7b72; }
+  .fn  { color: #d2a8ff; }
+  .str { color: #a5d6ff; }
+  .cm  { color: #6e7681; font-style: italic; }
+  .ok  { color: var(--green); }
+  .bad { color: var(--red); }
+  .hl  { color: var(--text); }
+
+  /* ── Diagram ── */
+  .diagram {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    margin: 20px 0 28px;
+    overflow-x: auto;
+  }
+
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+    row-gap: 12px;
+  }
+  .flow-node {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    text-align: center;
+  }
+  .flow-node.accent { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .flow-node.green  { border-color: var(--green);  color: var(--green);  background: var(--green-dim); }
+  .flow-node.yellow { border-color: var(--yellow); color: var(--yellow); background: var(--yellow-dim); }
+  .flow-node.purple { border-color: var(--purple); color: var(--purple); background: var(--purple-dim); }
+  .flow-arrow {
+    font-size: 16px;
+    color: var(--text-dim);
+    padding: 0 6px;
+  }
+
+  .loop-diagram {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 20px 0;
+  }
+  .loop-step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .loop-num {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+    font-family: var(--mono);
+  }
+  .loop-label { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .loop-sub   { font-size: 11.5px; color: var(--text-muted); line-height: 1.4; }
+
+  /* ── File tree ── */
+  .filetree {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 2;
+    margin: 16px 0 24px;
+  }
+  .ft-dir   { color: var(--accent); font-weight: 600; }
+  .ft-file  { color: var(--text-muted); }
+  .ft-comment { color: var(--text-dim); }
+  .ft-human { color: var(--yellow); }
+  .ft-agent { color: var(--green); }
+  .ft-both  { color: var(--purple); }
+
+  /* ── Step cards ── */
+  .steps { display: flex; flex-direction: column; gap: 2px; margin: 20px 0; }
+  .step-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    transition: border-color 0.15s;
+  }
+  .step-card:hover { border-color: var(--accent); }
+  .step-card .snum {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--accent-dim);
+    padding: 3px 8px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .step-card .stitle { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+  .step-card .sdesc  { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+  .step-card.verify  { border-left: 3px solid var(--green); }
+  .step-card.verify .snum { background: var(--green-dim); color: var(--green); }
+
+  /* ── Spec-kit cards ── */
+  .spec-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .spec-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .spec-card .filename {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--yellow);
+    margin-bottom: 6px;
+  }
+  .spec-card .title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .spec-card .desc  { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
+  .spec-card .who {
+    margin-top: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+    display: inline-block;
+  }
+  .who-human  { background: var(--yellow-dim); color: var(--yellow); }
+  .who-agent  { background: var(--green-dim);  color: var(--green); }
+
+  /* ── Comparison ── */
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 20px 0;
+  }
+  .compare-col {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .compare-col.bad-col  { border-top: 3px solid var(--red); }
+  .compare-col.good-col { border-top: 3px solid var(--green); }
+  .compare-col h4 { margin-top: 0; font-size: 12px; }
+  .compare-col.bad-col  h4 { color: var(--red); }
+  .compare-col.good-col h4 { color: var(--green); }
+  .compare-col ul { padding-left: 18px; }
+  .compare-col li { font-size: 13px; color: var(--text-muted); margin-bottom: 6px; line-height: 1.5; }
+
+  /* ── Phase roadmap ── */
+  .phase-list { display: flex; flex-direction: column; gap: 12px; margin: 20px 0; }
+  .phase-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .phase-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    flex-shrink: 0;
+    margin-top: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .phase-now    { background: var(--green-dim);  color: var(--green); }
+  .phase-next   { background: var(--accent-dim); color: var(--accent); }
+  .phase-future { background: var(--surface2);   color: var(--text-dim); border: 1px solid var(--border); }
+  .phase-title  { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+  .phase-desc   { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+
+  /* ── Checklist ── */
+  .checklist { list-style: none; padding: 0; margin: 12px 0; }
+  .checklist li {
+    padding: 6px 0;
+    font-size: 13.5px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist li::before {
+    content: '○';
+    color: var(--text-dim);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .checklist li strong { color: var(--text); }
+
+  /* ── Divider ── */
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+
+  /* ── Footer ── */
+  .app-footer {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: 28px; display: flex; align-items: center; justify-content: center;
+    background: var(--surface); border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--text-muted); letter-spacing: 0.3px;
+    z-index: 200; user-select: none;
+  }
+  .app-footer .footer-sep { margin: 0 8px; color: var(--border); }
+  .app-footer .footer-brand {
+    font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+    background: linear-gradient(90deg, #38bdf8, #818cf8);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  body { padding-bottom: 28px; }
+
+  /* ── Scrollspy ── */
+  @media (max-width: 900px) {
+    nav { display: none; }
+    main { margin-left: 0; padding: 32px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════
+     SIDEBAR
+══════════════════════════════════════════════════════ -->
+<nav id="sidebar">
+  <div class="nav-logo">
+    <div class="badge">Guide</div>
+    <h1>Agentic AI<br>Development</h1>
+    <p style="font-size:10px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;margin-top:8px;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Bounteous</p>
+  </div>
+
+  <div class="nav-section">Introduction</div>
+  <a href="#intro">What is Agentic AI?</a>
+  <a href="#vs-traditional">vs Traditional AI Usage</a>
+  <a href="#mental-model">The Mental Model</a>
+
+  <div class="nav-section">The Skeleton</div>
+  <a href="#folder-structure">Folder Structure</a>
+  <a href="#spec-kit">spec-kit/ — Project Memory</a>
+  <a href="#context">context/ — Living Docs</a>
+  <a href="#tasks">tasks/ — Work Items</a>
+
+  <div class="nav-section">Agent Protocol</div>
+  <a href="#protocol">8-Step Protocol</a>
+  <a href="#self-verify">Self-Verification Loop</a>
+  <a href="#completion">Completion Report</a>
+
+  <div class="nav-section">Using It</div>
+  <a href="#setup">Adopting the Skeleton</a>
+  <a href="#bootstrap">Day 1 Bootstrap</a>
+  <a href="#writing-tasks">Writing Good Tasks</a>
+  <a href="#dos-donts">Do's and Don'ts</a>
+
+  <div class="nav-section">What's Next</div>
+  <a href="#roadmap">Evolution Roadmap</a>
+
+  <div class="nav-section">More Guides</div>
+  <a href="tutorial-spec-kit.html">📐 Spec-Kit Files Guide</a>
+  <a href="tutorial-spec-files.html">🗂️ MODULE_MAP &amp; DATA_MODEL</a>
+  <a href="setup-wizard.html">🧙 Setup Wizard</a>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════
+     MAIN
+══════════════════════════════════════════════════════ -->
+<main>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="tag">Agentic SDD — Spec-Driven Development</div>
+    <h1>AI-First Development<br>with an Agentic Protocol</h1>
+    <p>A practical guide to running Claude as an autonomous development agent on your codebase — accurately, safely, and at scale.</p>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="intro">
+    <h2><span class="section-num">01</span>What is Agentic AI Development?</h2>
+    <p class="lead">Agentic AI means the AI doesn't just answer your question — it <strong>reads context, makes decisions, takes action, verifies its work, and reports back.</strong> It behaves like an autonomous team member with a defined protocol, not a chatbot you prompt repeatedly.</p>
+
+    <p>In a traditional AI workflow you describe the context every session, remind it of the rules, and re-prompt when it goes wrong. In an agentic workflow, the AI navigates your codebase itself, loads the rules it needs, writes the code, checks its own work, and hands back a structured report.</p>
+
+    <div class="callout callout-blue">
+      <strong>The key distinction:</strong> An agent is accountable to its output. Before it marks a task done, it verifies each acceptance criterion with specific evidence — a file, a function, a test. "I implemented it" is not evidence.
+    </div>
+
+    <h3>The Agent Loop</h3>
+    <div class="diagram">
+      <div class="flow">
+        <div class="flow-node accent">Read context</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">Understand task</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">Execute</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node green">Self-verify</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">Self-correct</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node yellow">Report</div>
+      </div>
+    </div>
+
+    <p>The loop repeats every task. Each iteration makes the agent smarter — it updates <code>context/</code> files with what it learned, so the next session starts with better knowledge than the last.</p>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="vs-traditional">
+    <h2><span class="section-num">02</span>vs Traditional AI Usage</h2>
+
+    <div class="compare">
+      <div class="compare-col bad-col">
+        <h4>❌ Traditional AI Usage</h4>
+        <ul>
+          <li>You paste context and rules every session</li>
+          <li>AI answers what you asked, not what you needed</li>
+          <li>No memory between sessions — starts fresh every time</li>
+          <li>You decide what files to show it</li>
+          <li>You manually verify the output</li>
+          <li>Rules drift — AI forgets conventions after 20 messages</li>
+          <li>No audit trail — who did what, when, why</li>
+        </ul>
+      </div>
+      <div class="compare-col good-col">
+        <h4>✅ Agentic AI (this approach)</h4>
+        <ul>
+          <li>Rules live in <code>spec-kit/</code> — always loaded, never forgotten</li>
+          <li>Agent navigates the codebase via <code>MODULE_MAP.md</code></li>
+          <li>Knowledge accumulates in <code>context/</code> after every task</li>
+          <li>Agent decides what files to read — you don't babysit it</li>
+          <li>Agent verifies its own work before reporting done</li>
+          <li>Conventions are non-negotiable — enforced by protocol</li>
+          <li>Completion report is a structured audit trail per task</li>
+        </ul>
+      </div>
+    </div>
+
+    <table>
+      <tr><th>Dimension</th><th>Traditional</th><th>Agentic (this skeleton)</th></tr>
+      <tr><td><strong>Context loading</strong></td><td>Manual — you paste it</td><td>Automatic — tiered loading protocol</td></tr>
+      <tr><td><strong>Rule enforcement</strong></td><td>Hope-based</td><td>Spec-kit + quality gate</td></tr>
+      <tr><td><strong>Task scope</strong></td><td>Drifts with conversation</td><td>Bounded by task MD + Out of Scope section</td></tr>
+      <tr><td><strong>Verification</strong></td><td>You review everything</td><td>Agent self-verifies, then you review the report</td></tr>
+      <tr><td><strong>Knowledge retention</strong></td><td>Lost each session</td><td>Grows with every PR via context files</td></tr>
+      <tr><td><strong>Predictability</strong></td><td>Varies with prompt quality</td><td>Consistent — protocol is fixed</td></tr>
+    </table>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="mental-model">
+    <h2><span class="section-num">03</span>The Mental Model</h2>
+    <p class="lead">Three types of files. Each has a clear owner and a clear purpose. The agent never confuses them.</p>
+
+    <div class="loop-diagram">
+      <div class="loop-step">
+        <div class="loop-num" style="background:var(--yellow-dim);color:var(--yellow)">📋</div>
+        <div>
+          <div class="loop-label">spec-kit/ — "What the project IS"</div>
+          <div class="loop-sub">Architecture decisions, coding standards, data models, known debt. <strong>Humans write it. Agent reads it. Changes rarely.</strong></div>
+        </div>
+      </div>
+      <div class="loop-step">
+        <div class="loop-num" style="background:var(--green-dim);color:var(--green)">🔄</div>
+        <div>
+          <div class="loop-label">context/ — "What each module looks like NOW"</div>
+          <div class="loop-sub">Key files, state shapes, gotchas, test coverage. <strong>Agent writes it after every task. Grows smarter over time.</strong></div>
+        </div>
+      </div>
+      <div class="loop-step">
+        <div class="loop-num" style="background:var(--accent-dim);color:var(--accent)">✏️</div>
+        <div>
+          <div class="loop-label">tasks/ — "What to do NEXT"</div>
+          <div class="loop-sub">One MD file per ticket. Developer writes it. Agent executes and reports. <strong>Tasks stay as a log after merge.</strong></div>
+        </div>
+      </div>
+      <div class="loop-step">
+        <div class="loop-num" style="background:var(--purple-dim);color:var(--purple)">⚙️</div>
+        <div>
+          <div class="loop-label">CLAUDE.md — "How to BEHAVE"</div>
+          <div class="loop-sub">The agent's 8-step protocol. Every session starts here. <strong>Never edit this unless intentionally changing agent behaviour for all future tasks.</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout callout-yellow">
+      <strong>The two-line summary:</strong> spec-kit is the project's long-term memory. context is the project's short-term, task-updated memory. Together they let the agent work accurately without being spoon-fed context every time.
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="folder-structure">
+    <h2><span class="section-num">04</span>Folder Structure</h2>
+
+    <div class="filetree">
+<span class="ft-dir">my-project-sdd/</span><br>
+├── <span class="ft-human">project.config.md</span>      <span class="ft-comment">← Edit once per project (codebase path, platform, language)</span><br>
+├── <span class="ft-file">CLAUDE.md</span>               <span class="ft-comment">← Agent entry point — never modify</span><br>
+├── <span class="ft-file">README.md</span>               <span class="ft-comment">← Adoption guide</span><br>
+│<br>
+├── <span class="ft-file">setup-wizard.html</span>       <span class="ft-comment">← Multi-platform setup wizard — open in Chrome</span><br>
+├── <span class="ft-file">platform-android.js</span>     <span class="ft-comment">← Android wizard logic (Gradle, Kotlin/Java, Hilt…)</span><br>
+├── <span class="ft-file">platform-ios.js</span>         <span class="ft-comment">← iOS wizard logic (SPM, Swift/ObjC, Xcode targets…)</span><br>
+├── <span class="ft-file">wizard-core.js</span>          <span class="ft-comment">← Platform-agnostic wizard engine (state, file I/O, nav)</span><br>
+│<br>
+├── <span class="ft-dir">spec-kit/</span>                <span class="ft-comment">← Human-authored. Agent reads only, never modifies.</span><br>
+│   ├── <span class="ft-human">ARCHITECTURE.md</span>    <span class="ft-comment">← Module structure, ADRs, patterns, violations</span><br>
+│   ├── <span class="ft-human">CONVENTIONS.md</span>     <span class="ft-comment">← Naming, patterns, ViewModel/DI rules with ❌/✅ examples</span><br>
+│   ├── <span class="ft-human">DATA_MODEL.md</span>      <span class="ft-comment">← Domain entities, DB schema, API contracts</span><br>
+│   ├── <span class="ft-human">MIGRATION_RULES.md</span> <span class="ft-comment">← How to handle legacy patterns (LiveData, RxJava, MVP)</span><br>
+│   ├── <span class="ft-human">MODULE_MAP.md</span>      <span class="ft-comment">← Module registry — paths, key classes, debt anchors</span><br>
+│   ├── <span class="ft-human">TECH_DEBT.md</span>       <span class="ft-comment">← Known debt by module, agent rules per entry</span><br>
+│   └── <span class="ft-human">TESTING.md</span>         <span class="ft-comment">← Test frameworks, patterns, coverage targets</span><br>
+│<br>
+├── <span class="ft-dir">context/</span>                 <span class="ft-comment">← Agent writes after each task. Review in PRs.</span><br>
+│   ├── <span class="ft-human">_index.md</span>          <span class="ft-comment">← Authoritative keyword routing table — keyword → context file</span><br>
+│   ├── <span class="ft-file">TEMPLATE.md</span>         <span class="ft-comment">← Copy to add a new module</span><br>
+│   ├── <span class="ft-agent">auth.md</span>            <span class="ft-comment">← Updated by agent after every auth-related task</span><br>
+│   └── <span class="ft-agent">home.md</span>            <span class="ft-comment">← Updated by agent after every home-related task</span><br>
+│<br>
+└── <span class="ft-dir">tasks/</span><br>
+    ├── <span class="ft-file">TASK_TEMPLATE.md</span>    <span class="ft-comment">← Copy per ticket, fill in, run</span><br>
+    ├── <span class="ft-file">TASK_GUIDE.md</span>       <span class="ft-comment">← How to write task MDs that work well with Claude</span><br>
+    └── <span class="ft-human">[PROJ]-1234.md</span>     <span class="ft-comment">← A real task — developer writes this</span>
+    </div>
+
+    <h4>Colour legend</h4>
+    <p>
+      <span style="color:var(--yellow);font-family:var(--mono);font-size:13px">■</span> Human-authored &nbsp;&nbsp;
+      <span style="color:var(--green);font-family:var(--mono);font-size:13px">■</span> Agent-written &nbsp;&nbsp;
+      <span style="color:var(--text-muted);font-family:var(--mono);font-size:13px">■</span> Static / template
+    </p>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="spec-kit">
+    <h2><span class="section-num">05</span>spec-kit/ — Project Memory</h2>
+    <p class="lead">The spec-kit is the agent's knowledge base. Every file is human-authored, version-controlled, and loaded automatically before each task. The agent never modifies these files — it only reads them.</p>
+
+    <div class="spec-grid">
+      <div class="spec-card">
+        <div class="filename">ARCHITECTURE.md</div>
+        <div class="title">Architecture & Decisions</div>
+        <div class="desc">Module structure, threading model, navigation, networking, storage. Critically: ADRs (Architecture Decision Records) — dated decisions with Kotlin code examples, consequences, and the reason behind each choice.</div>
+        <span class="who who-human">Tech lead writes</span>
+      </div>
+      <div class="spec-card">
+        <div class="filename">CONVENTIONS.md</div>
+        <div class="title">Coding Standards</div>
+        <div class="desc">Non-negotiable rules with ❌/✅ code examples. ViewModel pattern, UiState shape, Intent sealed class, DI, Compose rules. Every rule the agent must follow exactly.</div>
+        <span class="who who-human">Tech lead writes</span>
+      </div>
+      <div class="spec-card">
+        <div class="filename">MODULE_MAP.md</div>
+        <div class="title">Navigation Backbone</div>
+        <div class="desc">One entry per Gradle module. Keywords, paths, key classes, dependencies, context file pointer. The agent matches task keywords against this table to know which context files to load.</div>
+        <span class="who who-human">Tech lead writes</span>
+      </div>
+      <div class="spec-card">
+        <div class="filename">MIGRATION_RULES.md</div>
+        <div class="title">Legacy Handling Rules</div>
+        <div class="desc">How to handle LiveData, RxJava, MVP, AsyncTask, SharedPreferences, direct Retrofit calls. Rules with ❌/✅ examples. Applied only to lines the agent touches — never forces a full migration.</div>
+        <span class="who who-human">Tech lead writes</span>
+      </div>
+      <div class="spec-card">
+        <div class="filename">TECH_DEBT.md</div>
+        <div class="title">Debt Register</div>
+        <div class="desc">Known debt entries per module with status (OPEN/SCHEDULED/RESOLVED), location, impact, and a precise agent rule. The agent loads only the sections relevant to the current task.</div>
+        <span class="who who-human">Team writes</span>
+      </div>
+      <div class="spec-card">
+        <div class="filename">TESTING.md</div>
+        <div class="title">Testing Standards</div>
+        <div class="desc">Framework stack, ViewModel test pattern with MockK + Turbine, mocking rules, test file location convention, coverage targets per layer. Loaded whenever a task requires tests.</div>
+        <span class="who who-human">Tech lead writes</span>
+      </div>
+    </div>
+
+    <div class="callout callout-yellow">
+      <strong>Important:</strong> Each spec-kit file starts with <code>&gt; Agent: ...</code> — a blockquote directive that tells the agent when to load this file and what the non-negotiable rules are. The agent reads this first.
+    </div>
+
+    <h3>What makes a spec-kit file effective</h3>
+    <table>
+      <tr><th>Pattern</th><th>Why it works</th></tr>
+      <tr><td><strong>❌/✅ code examples</strong></td><td>The agent pattern-matches on code, not descriptions. Showing the wrong pattern alongside the right one makes violations obvious.</td></tr>
+      <tr><td><strong>Pipe tables for structured data</strong></td><td>Renders as visual tables in VS Code preview and GitHub. Easier to scan than bullet lists.</td></tr>
+      <tr><td><strong>"Agent must never" phrasing</strong></td><td>Explicit negative constraints are more reliably followed than positive-only rules.</td></tr>
+      <tr><td><strong>ADRs with dates</strong></td><td>Context for why a decision was made — prevents the agent from "improving" things that were intentional.</td></tr>
+    </table>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="context">
+    <h2><span class="section-num">06</span>context/ — Living Docs</h2>
+    <p class="lead">Context files are the agent's accumulated knowledge about each module. Unlike spec-kit (which is static), these files grow smarter with every task. <strong>The skeleton gets more accurate over time.</strong></p>
+
+    <p>After every task the agent updates the relevant <code>context/&lt;module&gt;.md</code> with what it learned: new files added, state shapes changed, new debt discovered, gotchas encountered.</p>
+
+    <h3>What a context file contains</h3>
+    <table>
+      <tr><th>Section</th><th>Contents</th><th>Updated when</th></tr>
+      <tr><td><strong>Key Files</strong></td><td>Table of the most important source files with one-line descriptions</td><td>A new file is created</td></tr>
+      <tr><td><strong>State Management</strong></td><td>What the ViewModel exposes — UiState shape, sealed class definitions</td><td>State changes in any task</td></tr>
+      <tr><td><strong>Known Debt</strong></td><td>Debt discovered during this task (full detail stays in TECH_DEBT.md)</td><td>New debt found</td></tr>
+      <tr><td><strong>Tests</strong></td><td>Test file → scenarios mapping, coverage gaps</td><td>New tests written</td></tr>
+      <tr><td><strong>What the Agent Should Know</strong></td><td>Non-obvious facts, gotchas, invariants, must-not-remove workarounds</td><td>Agent discovers something surprising</td></tr>
+    </table>
+
+    <div class="callout callout-green">
+      <strong>Review context file changes in PRs.</strong> They appear alongside the code changes. If the agent wrote something incorrect, correct it — that correction will persist for all future sessions.
+    </div>
+
+    <h3>The routing index</h3>
+    <p>The <code>context/_index.md</code> is a keyword routing table. When the agent reads a task MD, it matches task keywords against this index to know which module context files to load. You seed it when adopting the skeleton; the agent adds to it as new modules are discovered.</p>
+
+    <pre><code><span class="cm">## Keyword Index</span>
+
+<span class="cm">| Keywords                              | Context file      |</span>
+<span class="cm">|---------------------------------------|-------------------|</span>
+<span class="hl">| login, logout, auth, session, token   | context/auth.md   |</span>
+<span class="hl">| home, dashboard, feed, landing        | context/home.md   |</span>
+<span class="hl">| network, API, retrofit, interceptor   | context/network.md|</span></code></pre>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="tasks">
+    <h2><span class="section-num">07</span>tasks/ — Work Items</h2>
+    <p class="lead">One MD file per ticket. The developer writes it; the agent executes it. The task MD is the contract — precision in, precision out.</p>
+
+    <h3>Anatomy of a task MD</h3>
+
+    <pre><code><span class="cm"># Task: [PROJ]-1234 — Track store_selected Firebase event</span>
+
+<span class="cm">## Type</span>
+<span class="hl">- [x] Feature</span>
+
+<span class="cm">## Description</span>
+<span class="hl">Add a store_selected Firebase Analytics event fired when the user selects a store</span>
+<span class="hl">in SelectStoreFragment. Firebase only — Adjust must not receive this event.</span>
+
+<span class="cm">## Acceptance Criteria</span>
+<span class="ok">- [ ] store_selected event fires when onStoreSelected() is called in SelectStoreFragment</span>
+<span class="ok">- [ ] Event includes store_id property with value store.id (String)</span>
+<span class="ok">- [ ] Event is NOT tracked in AdjustAnalytics</span>
+
+<span class="cm">## Quality Gate</span>
+<span class="hl">- [ ] No !! operators introduced</span>
+<span class="hl">- [ ] No new LiveData — new state uses StateFlow</span>
+<span class="hl">- [ ] No hardcoded strings</span>
+
+<span class="cm">## Out of Scope</span>
+<span class="bad">- Do not modify AdjustAnalytics.kt</span>
+<span class="bad">- Do not add store_selected tracking for delivery flow (separate ticket)</span>
+
+<span class="cm">## Affected Areas</span>
+<span class="hl">analytics, store selection, SelectStoreFragment, Analytics.kt</span>
+
+<span class="cm">## Testing</span>
+<span class="hl">Required: Y</span>
+<span class="hl">Level: Unit</span>
+<span class="hl">Scenarios:</span>
+<span class="hl">- [ ] trackStoreSelected() called with correct store_id when onStoreSelected() fires</span>
+<span class="hl">- [ ] AdjustAnalytics NOT called during store selection</span></code></pre>
+
+    <h3>The five rules for effective task MDs</h3>
+    <div class="steps">
+      <div class="step-card">
+        <div class="snum">R1</div>
+        <div>
+          <div class="stitle">Acceptance criteria are verifiable statements</div>
+          <div class="sdesc">Write as: "[thing] happens when [condition]" or "[value] equals [expected] when [condition]". The agent names the specific file and function as evidence. "It works correctly" is not verifiable.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="snum">R2</div>
+        <div>
+          <div class="stitle">Out of Scope is as important as the description</div>
+          <div class="sdesc">If you don't say what NOT to do, the agent may implement related things it thinks are helpful. Always list at least one exclusion, even if obvious.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="snum">R3</div>
+        <div>
+          <div class="stitle">One task = one ticket</div>
+          <div class="sdesc">Don't bundle backend + UI + analytics. Each is a separate task MD. Bundled tasks produce larger, harder-to-review diffs and increase the risk of something going wrong.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="snum">R4</div>
+        <div>
+          <div class="stitle">Affected Areas accelerates context loading</div>
+          <div class="sdesc">Even a one-word hint saves the agent from scanning wrong modules. "analytics, SelectStoreFragment" is enough. Without it the agent still finds the right files — just slower.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="snum">R5</div>
+        <div>
+          <div class="stitle">Test scenarios are prompts, not just checkboxes</div>
+          <div class="sdesc">If you list scenarios, the agent writes tests for exactly those. If you leave it blank, the agent writes tests based on what it thinks matters. Both work — listed scenarios produce more targeted tests.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="protocol">
+    <h2><span class="section-num">08</span>The 8-Step Agent Protocol</h2>
+    <p class="lead">Every Claude session starts by reading <code>CLAUDE.md</code>. This file defines a fixed 8-step protocol the agent follows for every task — no exceptions. It cannot be overridden by the task MD.</p>
+
+    <div class="steps">
+      <div class="step-card">
+        <div class="snum">S0</div>
+        <div>
+          <div class="stitle">Read project.config.md</div>
+          <div class="sdesc">Extract codebase path, platform, language, default_tests flag, branch convention. All file paths resolve from the codebase_path. This is the foundation for everything that follows.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="snum">S1</div>
+        <div>
+          <div class="stitle">Load Tiered Context</div>
+          <div class="sdesc">Six tiers loaded in order: always load ARCHITECTURE + MODULE_MAP, always load CONVENTIONS + MIGRATION_RULES + TESTING, then match keywords to load module context files, then tech debt for legacy files, then DATA_MODEL if network/DB, then source files from context.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="snum">S2</div>
+        <div>
+          <div class="stitle">Read the Task MD</div>
+          <div class="sdesc">Extract ticket ID, type, description, acceptance criteria, out-of-scope constraints, affected areas, testing requirements. The acceptance criteria become the definition of done.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="snum">S3</div>
+        <div>
+          <div class="stitle">State Understanding Before Touching Code</div>
+          <div class="sdesc">Agent writes out affected modules, context files loaded, files to create/modify, which migration rules apply, which debt is in scope, and any ambiguities — before writing a single line of code. If ambiguous: stop and ask.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="snum">S4</div>
+        <div>
+          <div class="stitle">Confirm Tests</div>
+          <div class="sdesc">Uses task MD's Required: Y/N if present. Falls back to project.config.md default_tests flag. Only asks the developer if both are absent and N.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="snum">S5</div>
+        <div>
+          <div class="stitle">Execute</div>
+          <div class="sdesc">Write code in order: new files first (models, repositories, use cases), then modify existing files, then test files. Follows CONVENTIONS.md and MIGRATION_RULES.md exactly.</div>
+        </div>
+      </div>
+      <div class="step-card verify">
+        <div class="snum">S6</div>
+        <div>
+          <div class="stitle">Self-Verification — do not skip ✓</div>
+          <div class="sdesc">The agentic feedback loop. See next section for detail. Agent verifies criteria with evidence, runs quality gate, logs self-corrections, issues PASS or BLOCKED verdict. Only proceeds if PASS.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="snum">S7</div>
+        <div>
+          <div class="stitle">Update Context Files</div>
+          <div class="sdesc">After verification passes: update context/&lt;module&gt;.md for every module touched. Add new files, update state shapes, log new debt, update tests section, add non-obvious discoveries.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="snum">S8</div>
+        <div>
+          <div class="stitle">Write Completion Report</div>
+          <div class="sdesc">Structured report: files created/modified, context files updated, tests written, acceptance criteria with evidence, quality gate results, self-corrections, follow-up debt. This is the audit trail.</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>The Ambiguity Protocol</h3>
+    <p>At Step 3, if any acceptance criterion is unclear or contradictory, the agent:</p>
+    <pre><code><span class="hl">1. Quotes the exact text that is unclear</span>
+<span class="hl">2. Asks ONE specific question</span>
+<span class="hl">3. STOPS — does not write code until the developer responds</span>
+
+<span class="cm">Do not assume. Do not interpret charitably and proceed. Stop and ask.</span></code></pre>
+    <p>This prevents the most common failure mode: agent makes a plausible-sounding assumption, writes 200 lines, and all of it solves the wrong problem.</p>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="self-verify">
+    <h2><span class="section-num">09</span>The Self-Verification Loop</h2>
+    <p class="lead">This is the core of the Agentic AI approach. After executing, the agent doesn't just report done — it proves it, catches its own mistakes, and only issues a PASS when all criteria are met with evidence.</p>
+
+    <div class="diagram">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="flow">
+          <div class="flow-node">Execute</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node green">6a: Check criteria</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node green">6b: Quality gate</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node green">6c: Self-correct</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node yellow">6d: Verdict</div>
+        </div>
+        <div style="display:flex;gap:8px;font-size:12px;color:var(--text-dim);padding-left:4px">
+          <div style="width:76px;text-align:center">↓</div>
+          <div style="width:130px;text-align:center;color:var(--green)">Evidence required</div>
+          <div style="width:130px;text-align:center;color:var(--green)">10 checks</div>
+          <div style="width:130px;text-align:center;color:var(--red)">Fix before proceeding</div>
+          <div style="width:100px;text-align:center;color:var(--yellow)">PASS or BLOCKED</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>6a — Acceptance Criteria Check</h3>
+    <p>For every acceptance criterion, the agent names the specific file, function, or test that proves it is satisfied:</p>
+
+    <pre><code><span class="cm">## Acceptance Criteria Check</span>
+
+<span class="ok">- [x] store_selected event fires when onStoreSelected() is called</span>
+<span class="ok">      verified: SelectStoreFragment.kt:L84 — Analytics.trackStoreSelected(store.id)</span>
+
+<span class="ok">- [x] Event includes store_id property</span>
+<span class="ok">      verified: Analytics.kt:L203 — trackStoreSelected(storeId: String) passes storeId to logEvent()</span>
+
+<span class="ok">- [x] Event NOT tracked in Adjust</span>
+<span class="ok">      verified: AdjustAnalytics.kt not modified (confirmed by grep)</span>
+
+<span class="bad">- [ ] Unit test confirms event fires with correct store_id</span>
+<span class="bad">      BLOCKED: SelectStoreViewModelTest.kt doesn't exist yet — will create in this task</span></code></pre>
+
+    <div class="callout callout-red">
+      <strong>"I implemented it" is not evidence.</strong> The agent must name the file and line number, or the test class and method name. This forces the agent to actually navigate to the code it wrote — catching errors that a surface-level pass would miss.
+    </div>
+
+    <h3>6b — Quality Gate</h3>
+    <p>The agent applies the Quality Gate table defined in <code>spec-kit/CONVENTIONS.md</code>. That table is platform-specific and authoritative — Android/Kotlin teams use the default set; iOS, Web, and Backend teams replace the table with their own equivalent checks.</p>
+
+    <p>The default Android/Kotlin checks cover:</p>
+    <table>
+      <tr><th>Check</th><th>Rule</th></tr>
+      <tr><td><strong>No <code>!!</code> operators</strong></td><td>Use <code>?.let {}</code>, <code>?: return</code>, or <code>requireNotNull</code></td></tr>
+      <tr><td><strong>No new LiveData</strong></td><td>New state uses <code>StateFlow</code> only</td></tr>
+      <tr><td><strong>No GlobalScope</strong></td><td>All coroutines in <code>viewModelScope</code> or <code>lifecycleScope</code></td></tr>
+      <tr><td><strong>No hardcoded strings</strong></td><td>All user-visible text in <code>strings.xml</code></td></tr>
+      <tr><td><strong>No hardcoded colours / dimensions</strong></td><td>Use theme attributes or <code>dimens.xml</code></td></tr>
+      <tr><td><strong>Sealed types exhaustive</strong></td><td>No <code>else</code> on <code>when</code> over sealed class/interface</td></tr>
+      <tr><td><strong>No business logic in UI layer</strong></td><td>Composables, Fragments, Activities call ViewModel only</td></tr>
+      <tr><td><strong>ViewModel has no Android imports</strong></td><td>No <code>Context</code>, <code>View</code>, <code>FragmentManager</code></td></tr>
+      <tr><td><strong>DTOs/Entities not exposed to UI</strong></td><td>Repository/Manager returns domain models only</td></tr>
+      <tr><td><strong>Tests follow naming convention</strong></td><td><code>functionName_scenario_expectedResult</code></td></tr>
+    </table>
+    <p style="margin-top:8px;color:var(--text-dim);font-size:14px">Non-Android teams: replace this table in <code>spec-kit/CONVENTIONS.md</code> — the agent reads it from there, not from CLAUDE.md.</p>
+
+    <h3>6c — Self-Corrections</h3>
+    <p>Any fix made during verification is logged transparently. This gives the developer full visibility into what the agent caught and corrected:</p>
+
+    <pre><code><span class="cm">## Self-Corrections</span>
+
+<span class="ok">- SelectStoreFragment.kt:L84 — used store!! instead of store ?: return</span>
+<span class="ok">  → changed to: val storeId = store?.id ?: return</span>
+
+<span class="ok">- AnalyticsViewModel.kt:L12 — imported android.content.Context unnecessarily</span>
+<span class="ok">  → removed import, passed string directly</span></code></pre>
+
+    <h3>6d — Verdict</h3>
+
+    <pre><code><span class="ok">Verdict: PASS</span>
+<span class="cm">All criteria verified with evidence. Quality gate clean. 2 self-corrections made and logged.</span>
+
+<span class="cm">--- or ---</span>
+
+<span class="bad">Verdict: BLOCKED</span>
+<span class="bad">Criterion 3 cannot be verified: the /auth/refresh endpoint is not yet deployed in staging.</span>
+<span class="bad">Please confirm the endpoint URL before I proceed.</span></code></pre>
+
+    <div class="callout callout-blue">
+      <strong>Why this changes the review dynamic:</strong> The completion report now tells you exactly what the agent verified and how. You're no longer reviewing the code blind — you're reviewing against the agent's own evidence. Spot-check the evidence; if it's accurate, the code is almost certainly correct.
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="completion">
+    <h2><span class="section-num">10</span>The Completion Report</h2>
+    <p class="lead">The completion report is the structured output of every task. It is the audit trail — you can read it weeks later and understand exactly what the agent did, what it verified, and what it chose not to do.</p>
+
+    <pre><code><span class="cm">## Done — [PROJ]-1234: Track store_selected Firebase event</span>
+
+<span class="cm">### Files created</span>
+<span class="hl">- feature/analytics/domain/usecase/TrackStoreSelectedUseCase.kt</span>
+
+<span class="cm">### Files modified</span>
+<span class="hl">- feature/store/ui/SelectStoreFragment.kt — added onStoreSelected() → usecase call</span>
+<span class="hl">- feature/analytics/Analytics.kt — added trackStoreSelected(storeId: String)</span>
+
+<span class="cm">### Context files updated</span>
+<span class="hl">- context/analytics.md — added TrackStoreSelectedUseCase to key files table</span>
+<span class="hl">- context/store.md — noted SelectStoreFragment now calls analytics on selection</span>
+
+<span class="cm">### Tests written</span>
+<span class="hl">- feature/analytics/.../TrackStoreSelectedUseCaseTest.kt</span>
+<span class="hl">  covers: fires with correct storeId, does NOT call AdjustAnalytics</span>
+
+<span class="cm">### Acceptance criteria</span>
+<span class="ok">- [x] store_selected fires when onStoreSelected() called</span>
+<span class="ok">      verified: SelectStoreFragment.kt:L84</span>
+<span class="ok">- [x] Event includes store_id property</span>
+<span class="ok">      verified: Analytics.kt:L203 + TrackStoreSelectedUseCaseTest::fires_withCorrectStoreId</span>
+<span class="ok">- [x] NOT tracked in Adjust</span>
+<span class="ok">      verified: AdjustAnalytics.kt unchanged (grep confirms no new calls)</span>
+
+<span class="cm">### Quality gate</span>
+<span class="ok">- [x] All checks passed</span>
+
+<span class="cm">### Self-corrections</span>
+<span class="hl">- SelectStoreFragment.kt:L84 — store!! → store ?: return</span>
+
+<span class="cm">### Excluded from this ticket</span>
+<span class="hl">- Delivery flow tracking — per Out of Scope ([PROJ]-2002)</span>
+
+<span class="cm">### Follow-up recommended</span>
+<span class="hl">- Analytics.kt:L198 — existing trackBasket() uses !! on basket.id. Not in scope. DEBT-004.</span></code></pre>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="setup">
+    <h2><span class="section-num">11</span>Adopting the Skeleton</h2>
+    <p class="lead">Time: 30–90 minutes, mostly filling in spec-kit files. The setup wizard (<code>setup-wizard.html</code>) supports <strong>Android and iOS</strong> — select your platform first, then grant folder access and the wizard auto-fills most fields from your project files.</p>
+
+    <div class="steps">
+      <div class="step-card">
+        <div class="snum">01</div>
+        <div>
+          <div class="stitle">Copy the skeleton to your project</div>
+          <div class="sdesc"><code>cp -r agentic-sdd-skeleton /path/to/MyProject-sdd</code> — keep it as a sibling to your main project, not inside it.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="snum">02</div>
+        <div>
+          <div class="stitle">Edit project.config.md (2 min)</div>
+          <div class="sdesc">Set codebase_path to your project root, platform (Android/iOS/Web/etc.), primary_language, and default_tests: Y. This is read at the start of every agent session.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="snum">03</div>
+        <div>
+          <div class="stitle">Open setup-wizard.html in Chrome (30–60 min)</div>
+          <div class="sdesc">Select your platform — <strong>Android</strong> or <strong>iOS</strong> — then grant folder access. The wizard auto-detects your stack: for Android it reads <code>build.gradle</code>, Gradle modules, and Kotlin/Java file counts; for iOS it reads <code>Package.swift</code>, <code>Podfile</code>, and <code>.xcodeproj</code> names, counting Swift vs ObjC files. Work through each step, click Generate &amp; Save per screen, then replace any [fill in] placeholders.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="snum">04</div>
+        <div>
+          <div class="stitle">Seed context/_index.md (5 min)</div>
+          <div class="sdesc">Add your module keywords to the routing table. Even 3–4 rows is enough to start. The agent grows this file over time as it encounters new modules.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="snum">05</div>
+        <div>
+          <div class="stitle">Run your first task</div>
+          <div class="sdesc"><code>cp tasks/TASK_TEMPLATE.md tasks/YOUR-001.md</code> → fill it in → open Claude Code and say: <em>"Read CLAUDE.md and execute tasks/YOUR-001.md"</em></div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Time investment per spec-kit file</h3>
+    <table>
+      <tr><th>File</th><th>Time</th><th>Who</th><th>What requires judgment</th></tr>
+      <tr><td><strong>ARCHITECTURE.md</strong></td><td>20–30 min</td><td>Tech lead</td><td>ADRs — why you chose each pattern, known violations. Wizard pre-fills layer structure, DI, async, nav choices.</td></tr>
+      <tr><td><strong>MODULE_MAP.md</strong></td><td>10–15 min</td><td>Tech lead</td><td>Android: Gradle module paths + key classes. iOS: SPM targets or Xcode groups + key Swift files. Debt anchors.</td></tr>
+      <tr><td><strong>context/_index.md</strong></td><td>5–10 min</td><td>Tech lead</td><td>Keywords — must be accurate; this is the routing table the agent uses</td></tr>
+      <tr><td><strong>CONVENTIONS.md</strong></td><td>10–15 min</td><td>Tech lead</td><td>Wizard generates platform-appropriate Quality Gate (Kotlin rules for Android; Swift/SwiftUI rules for iOS). Review and extend.</td></tr>
+      <tr><td><strong>MIGRATION_RULES.md</strong></td><td>5–10 min</td><td>Tech lead</td><td>Android: LiveData, RxJava, MVP, AsyncTask. iOS: UIKit→SwiftUI, delegates, callbacks, ObjC files.</td></tr>
+      <tr><td><strong>TECH_DEBT.md</strong></td><td>5–10 min</td><td>Any dev</td><td>Agent rules per debt entry — what to do when touching it</td></tr>
+      <tr><td><strong>TESTING.md</strong></td><td>5–10 min</td><td>Tech lead</td><td>Android: MockK + Turbine pattern. iOS: XCTest + async/await + @MainActor pattern. Coverage targets per layer.</td></tr>
+      <tr><td><strong>DATA_MODEL.md</strong></td><td>10–20 min</td><td>Data/backend owner</td><td>API contracts, entity validation rules. Android: Kotlin data classes + Gson/Moshi. iOS: Swift Codable structs + Decodable mappers.</td></tr>
+    </table>
+
+    <div class="callout callout-yellow">
+      <strong>Most important spec-kit file to get right:</strong> ARCHITECTURE.md — specifically the ADRs. An ADR that says "we use MVI because X" prevents the agent from "improving" your architecture with MVP patterns, because it understands the decision wasn't arbitrary.
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="bootstrap">
+    <h2><span class="section-num">12</span>Day 1 Bootstrap — Seeding Context on an Existing Codebase</h2>
+    <p class="lead">The system is designed for greenfield and brownfield projects equally. On a new project, context files grow naturally from your first tickets. On an <strong>existing codebase</strong>, you can pre-seed context files with a read-only bootstrap run — before any code changes are made.</p>
+
+    <div class="callout callout-yellow">
+      <strong>The Day 1 problem:</strong> Zero context files exist. Without them, the agent falls back to scanning 5–8 source files per task — slower and less accurate. A bootstrap run fixes this in minutes per module, with no code changes.
+    </div>
+
+    <h3>Two valid approaches</h3>
+    <div class="compare">
+      <div class="compare-col good-col">
+        <h4>Option A — Bootstrap first (recommended for large codebases)</h4>
+        <ul>
+          <li>Run <code>BOOTSTRAP_TEMPLATE.md</code> as a read-only task for each key module</li>
+          <li>Agent reads source files, extracts structure, generates <code>context/&lt;module&gt;.md</code></li>
+          <li>No production code is created or modified</li>
+          <li>Then run real feature/bug tickets — agent has full context from the start</li>
+          <li>Best when you have 5+ modules and want consistent quality from ticket 1</li>
+        </ul>
+      </div>
+      <div class="compare-col">
+        <h4>Option B — Let context grow naturally</h4>
+        <ul>
+          <li>Skip bootstrap, run real tickets immediately</li>
+          <li>Agent generates context files after each task (CLAUDE.md Step 7)</li>
+          <li>First 2–3 tasks per module are slightly slower (source file scan fallback)</li>
+          <li>Context quality is higher — built from actual task execution, not cold read</li>
+          <li>Best for small codebases or when you want to start shipping immediately</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>How to run a bootstrap task</h3>
+    <div class="steps">
+      <div class="step-card">
+        <div class="snum">01</div>
+        <div>
+          <div class="stitle">Copy BOOTSTRAP_TEMPLATE.md</div>
+          <div class="sdesc"><code>cp tasks/BOOTSTRAP_TEMPLATE.md tasks/BOOTSTRAP-profile.md</code> — one file per module.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="snum">02</div>
+        <div>
+          <div class="stitle">Fill in the Module section</div>
+          <div class="sdesc">Copy the module name, source path, and key classes from <code>spec-kit/MODULE_MAP.md</code>. Takes 2 minutes — everything you need is already in MODULE_MAP.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="snum">03</div>
+        <div>
+          <div class="stitle">Run it in Claude Code</div>
+          <div class="sdesc"><em>"Read CLAUDE.md and execute tasks/BOOTSTRAP-profile.md"</em> — the agent reads source files, generates <code>context/profile.md</code>, and adds a routing row to <code>context/_index.md</code>. No code changes.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="snum">04</div>
+        <div>
+          <div class="stitle">Review the generated context file</div>
+          <div class="sdesc">Check "What the Agent Should Know" — add anything it missed (deep link preconditions, nullable fields the UI assumes non-null, workarounds that must not be removed). This is the highest-value 5 minutes you'll spend.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="snum">05</div>
+        <div>
+          <div class="stitle">Repeat for each frequently-touched module</div>
+          <div class="sdesc">Prioritise the modules your current backlog touches most. You don't need to bootstrap every module — just the ones in the next 5–10 tickets.</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>What gets generated</h3>
+    <table>
+      <tr><th>Section</th><th>What the agent extracts</th></tr>
+      <tr><td><strong>Key Files</strong></td><td>All significant files in the module path — ViewModels, Repositories, Fragments, DI modules</td></tr>
+      <tr><td><strong>State Management</strong></td><td>StateFlow shapes, UiState data classes, sealed event types</td></tr>
+      <tr><td><strong>Dependencies</strong></td><td>What the module imports and what imports it</td></tr>
+      <tr><td><strong>Known Debt</strong></td><td>Any patterns matching <code>spec-kit/TECH_DEBT.md</code> rules found during the scan</td></tr>
+      <tr><td><strong>Tests</strong></td><td>Existing test files and coverage gaps</td></tr>
+      <tr><td><strong>What the Agent Should Know</strong></td><td>Non-obvious facts found during the read — nullable fields, singletons with shared state, invariants</td></tr>
+    </table>
+
+    <div class="callout callout-green">
+      <strong>Real example:</strong> After running a bootstrap task on a profile module, the agent auto-generated <code>context/profile.md</code>, <code>context/managers.md</code>, and <code>context/api-sdk.md</code>. The profile context file flagged stale dead code left from a previous ticket, identified that a manager class had no interface (testability debt), and documented the authoritative read/write rules for a marketing opt-in flow — non-obvious facts that would otherwise trip up every future agent session touching that area.
+    </div>
+
+    <h3>Bootstrap vs real task — key difference</h3>
+    <table>
+      <tr><th></th><th>Bootstrap task</th><th>Real feature/bug task</th></tr>
+      <tr><td><strong>Code changes</strong></td><td>None — read-only</td><td>Yes</td></tr>
+      <tr><td><strong>Output</strong></td><td><code>context/&lt;module&gt;.md</code> only</td><td>Source code + context file update</td></tr>
+      <tr><td><strong>When to run</strong></td><td>Once per module, before first real ticket</td><td>Every feature/bug ticket</td></tr>
+      <tr><td><strong>PR review</strong></td><td>Review context file for accuracy</td><td>Review code diff + context update</td></tr>
+    </table>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="writing-tasks">
+    <h2><span class="section-num">13</span>Writing Good Tasks</h2>
+
+    <h3>The acceptance criteria pattern</h3>
+    <div class="compare">
+      <div class="compare-col bad-col">
+        <h4>❌ Vague — cannot be verified</h4>
+        <ul>
+          <li>Analytics works correctly</li>
+          <li>Store selection is tracked</li>
+          <li>UI shows loading state</li>
+          <li>Error handling is improved</li>
+        </ul>
+      </div>
+      <div class="compare-col good-col">
+        <h4>✅ Specific — verifiable with evidence</h4>
+        <ul>
+          <li>store_selected event fires when onStoreSelected() called in SelectStoreFragment</li>
+          <li>Event includes store_id matching store.id from the AppStore object</li>
+          <li>LoginUiState.isLoading = true while loginUseCase is running</li>
+          <li>LoginUiState.generalError is set with server message on 401 response</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Common mistakes</h3>
+    <table>
+      <tr><th>Mistake</th><th>Fix</th></tr>
+      <tr><td><strong>Vague description</strong> ("improve analytics")</td><td>Describe exactly what event, property, trigger, and class</td></tr>
+      <tr><td><strong>No Out of Scope section</strong></td><td>Always list at least one exclusion — prevents scope creep</td></tr>
+      <tr><td><strong>Bundling multiple concerns</strong></td><td>Split backend + UI + analytics into separate task MDs</td></tr>
+      <tr><td><strong>Criteria that can't be verified</strong> ("works correctly")</td><td>Rewrite as observable behaviour with specific class/method</td></tr>
+      <tr><td><strong>Blank Affected Areas</strong></td><td>Add at minimum the feature name and one class name</td></tr>
+      <tr><td><strong>Testing: N with no explanation</strong></td><td>OK — agent will note what could be tested in the report</td></tr>
+    </table>
+
+    <h3>After the agent finishes</h3>
+    <ul class="checklist">
+      <li><strong>Check the completion report</strong> — every criterion should be ticked with evidence, or explicitly blocked with a reason</li>
+      <li><strong>Review context file changes alongside code</strong> — they appear in the same PR; if the agent wrote something wrong, correct it in that PR</li>
+      <li><strong>Review "Follow-up recommended"</strong> — add any new debt to TECH_DEBT.md if it warrants an entry</li>
+      <li><strong>Review Self-corrections</strong> — each one tells you something the agent caught that you might want to add to the Quality Gate for future tasks</li>
+    </ul>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="dos-donts">
+    <h2><span class="section-num">14</span>Do's and Don'ts</h2>
+
+    <div class="compare">
+      <div class="compare-col good-col">
+        <h4>✅ Do</h4>
+        <ul>
+          <li>Keep spec-kit files concise — 1–3 pages each keeps token cost low</li>
+          <li>Review context file changes in every PR — they're part of the diff</li>
+          <li>Write ADRs when architecture decisions change — even small ones</li>
+          <li>Add debt to TECH_DEBT.md immediately when discovered — don't rely on memory</li>
+          <li>Use the Quality Gate in task MDs to add task-specific checks</li>
+          <li>Split large features into multiple task MDs — one per concern</li>
+          <li>Trust BLOCKED verdicts — the agent stops because it genuinely can't verify something</li>
+        </ul>
+      </div>
+      <div class="compare-col bad-col">
+        <h4>❌ Don't</h4>
+        <ul>
+          <li>Edit CLAUDE.md unless intentionally changing protocol for all future tasks</li>
+          <li>Edit spec-kit/ files from inside a Claude session — they are human-authored</li>
+          <li>Skip the Affected Areas field — it costs tokens and time</li>
+          <li>Write acceptance criteria you can't verify (no observable behaviour)</li>
+          <li>Ignore the Self-corrections section — it shows you what quality problems the agent caught</li>
+          <li>Let context files go stale — correct wrong entries in the PR before merging</li>
+          <li>Bundle tasks to "save time" — bundled tasks produce unmergeable diffs</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Token cost guidance</h3>
+    <table>
+      <tr><th>Task type</th><th>Files loaded</th><th>Approx. input tokens</th></tr>
+      <tr><td><strong>Simple bug, 1 module</strong></td><td>Tiers 0–3 + 1 context + 2–3 source files</td><td>~8–15k</td></tr>
+      <tr><td><strong>Feature, 1 module</strong></td><td>Tiers 0–3 + 1 context + 4–6 source files</td><td>~15–25k</td></tr>
+      <tr><td><strong>Cross-module feature</strong></td><td>Tiers 0–5 + 2–3 context + 6–10 source files</td><td>~30–50k</td></tr>
+      <tr><td><strong>Data model change</strong></td><td>Tiers 0–5 + DATA_MODEL + context + source</td><td>~25–40k</td></tr>
+    </table>
+    <p>Verbose spec-kit files multiply cost. Keep each file tight. Delete content that no longer applies.</p>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <section id="roadmap">
+    <h2><span class="section-num">15</span>Evolution Roadmap</h2>
+    <p class="lead">This skeleton implements Phase 1 of a mature Agentic AI development approach. The phases below represent the natural evolution — each builds on the previous.</p>
+
+    <div class="phase-list">
+      <div class="phase-card">
+        <div class="phase-badge phase-now">Phase 1 — Now</div>
+        <div>
+          <div class="phase-title">Self-Verification Loop ✓</div>
+          <div class="phase-desc">Agent verifies its own work before reporting done. Acceptance criteria require evidence (file + line). Quality gate catches violations. Self-corrections are logged. PASS/BLOCKED verdict before closing the loop. <strong>This is the current implementation.</strong></div>
+        </div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-badge phase-next">Phase 2 — Next</div>
+        <div>
+          <div class="phase-title">Living Context — Agent Accumulates Knowledge</div>
+          <div class="phase-desc">Formalise context file updates: define what "a good update" looks like, add a context review checklist, and establish a policy for when context files expire. The skeleton already supports this — Phase 2 makes it rigorous.</div>
+        </div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-badge phase-next">Phase 3 — Near Future</div>
+        <div>
+          <div class="phase-title">Multi-Agent Roles</div>
+          <div class="phase-desc">Split the single agent into specialised roles: Planner (breaks features into subtasks), Coder (executes one subtask), Reviewer (checks diff against spec-kit rules), Tester (writes and runs tests). Each has its own prompt file in <code>agents/</code>. The Planner spawns the others.</div>
+        </div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-badge phase-future">Phase 4 — Future</div>
+        <div>
+          <div class="phase-title">Observability — Audit Trail and Metrics</div>
+          <div class="phase-desc">A <code>reports/</code> folder where each completed task drops a structured JSON report: rules applied, violations found, debt logged, files touched, self-corrections made. Over time this becomes a leadership dashboard: agent rule compliance rate, debt growth/reduction, coverage trends.</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Why this approach scales with your organisation</h3>
+    <table>
+      <tr><th>Challenge</th><th>How the skeleton addresses it</th></tr>
+      <tr><td><strong>New team members</strong></td><td>The spec-kit is the codebase onboarding document. New devs read it before writing their first line — same as the agent.</td></tr>
+      <tr><td><strong>Growing codebase</strong></td><td>MODULE_MAP.md scales horizontally. Add a row per module. Context files accumulate per module independently.</td></tr>
+      <tr><td><strong>Technical debt</strong></td><td>TECH_DEBT.md + MIGRATION_RULES.md prevents the agent from replicating debt while still making forward progress.</td></tr>
+      <tr><td><strong>Architecture drift</strong></td><td>ADRs in ARCHITECTURE.md explain why decisions were made — prevents the agent (and new developers) from "improving" intentional choices.</td></tr>
+      <tr><td><strong>Code review load</strong></td><td>Self-verification reduces trivial review findings. The completion report tells reviewers exactly what to check and how.</td></tr>
+      <tr><td><strong>Leadership visibility</strong></td><td>Completion reports are structured, readable audit trails. Phase 4 turns them into metrics.</td></tr>
+    </table>
+
+    <div class="callout callout-green">
+      <strong>The compounding effect:</strong> After 10 tasks, context files know your codebase better than most new team members. After 50 tasks, the skeleton has a living record of every architectural decision, every piece of debt, and every pattern in active use. This knowledge doesn't live in someone's head — it's in version control.
+    </div>
+  </section>
+
+</main>
+
+<footer class="app-footer">
+  <span>🔒 Confidential</span>
+  <span class="footer-sep">|</span>
+  <span class="footer-brand">Bounteous</span>
+</footer>
+
+<script>
+  // Scrollspy
+  const sections = document.querySelectorAll('section[id]');
+  const links    = document.querySelectorAll('nav a[href^="#"]');
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const active = document.querySelector(`nav a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
