@@ -1,4 +1,4 @@
-What SDD is — the heart/memory mental model upfront
+What SDD is the heart/memory mental model upfront
 Full folder structure — every file explained in one glance, AI artifacts vs human-authored called out
 4-step adoption guide — copy skeleton → wizard → bootstrap → run tasks
 Wizard section — mentions platform picker, step table, tutorial links
