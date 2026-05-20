@@ -312,15 +312,28 @@ async function analyzeProject() {
   showToast('Analyzing project…', 'info');
 
   // Read Gradle files from the project root
-  const [rootGradle, appGradle, settings] = await Promise.all([
+  const [rootGradle, settings] = await Promise.all([
     tryReadFile(state.dirHandle, 'build.gradle').then(t => t ?? tryReadFile(state.dirHandle, 'build.gradle.kts')),
-    tryReadFile(state.dirHandle, 'app', 'build.gradle').then(t => t ?? tryReadFile(state.dirHandle, 'app', 'build.gradle.kts')),
     tryReadFile(state.dirHandle, 'settings.gradle').then(t => t ?? tryReadFile(state.dirHandle, 'settings.gradle.kts')),
   ]);
 
-  if (!rootGradle && !appGradle && !settings) {
+  if (!rootGradle && !settings) {
     showToast('No Gradle files found — fill in manually', 'info');
     return;
+  }
+
+  // Resolve the app module directory: try 'app/' first, then any module listed in settings.gradle
+  // that contains 'com.android.application' in its build.gradle.
+  let appGradle = await tryReadFile(state.dirHandle, 'app', 'build.gradle')
+               ?? await tryReadFile(state.dirHandle, 'app', 'build.gradle.kts');
+  if (!appGradle && settings) {
+    const moduleNames = [...settings.matchAll(/include\s*['"]:?([\w\-]+)['"]/g)].map(m => m[1]);
+    for (const mod of moduleNames) {
+      if (mod === 'app') continue; // already tried
+      const candidate = await tryReadFile(state.dirHandle, mod, 'build.gradle')
+                     ?? await tryReadFile(state.dirHandle, mod, 'build.gradle.kts');
+      if (candidate && /com\.android\.application/.test(candidate)) { appGradle = candidate; break; }
+    }
   }
 
   const gradle = ((rootGradle || '') + '\n' + (appGradle || '')).toLowerCase();
@@ -358,18 +371,34 @@ async function analyzeProject() {
   const targetSdkMatch= (appGradle || '').match(/\btargetSdk(?:Version)?\b\s*=?\s*(\d+)/);
 
   // productFlavors — Groovy: flavorName { ... }  /  KTS: create("flavorName") { ... }
+  // Use brace-counting to extract the full block (lazy regex stops at the first inner `}`)
   const detectedVariants = [];
-  const flavorsBlock = (appGradle || '').match(/productFlavors\s*\{([\s\S]*?)\n\s*\}/);
-  if (flavorsBlock) {
-    const block = flavorsBlock[1];
-    const groovyFlavors = [...block.matchAll(/\b(\w+)\s*\{([^}]*)\}/g)];
-    const ktsFlavors    = [...block.matchAll(/create\s*\(\s*["'](\w+)["']\s*\)\s*\{([^}]*)\}/g)];
-    for (const [, name, body] of [...groovyFlavors, ...ktsFlavors]) {
-      if (['dimension', 'flavorDimensions'].includes(name)) continue;
+  const flavorsStart = (appGradle || '').search(/productFlavors\s*\{/);
+  if (flavorsStart !== -1) {
+    const openAt = appGradle.indexOf('{', flavorsStart);
+    let depth = 0, i = openAt, flavorsInner = '';
+    for (; i < appGradle.length; i++) {
+      if (appGradle[i] === '{') depth++;
+      else if (appGradle[i] === '}') { depth--; if (depth === 0) { flavorsInner = appGradle.slice(openAt + 1, i); break; } }
+    }
+    // Extract each inner flavor block the same way
+    const flavorRe = /\b(\w+)\s*\{|create\s*\(\s*["'](\w+)["']\s*\)\s*\{/g;
+    let fm;
+    const _skipNames = new Set(['dimension','flavorDimensions','signingConfig','buildTypes','sourceSets','testOptions','compileOptions','kotlinOptions','lint','buildFeatures','android','defaultConfig']);
+    while ((fm = flavorRe.exec(flavorsInner)) !== null) {
+      const name = fm[1] || fm[2];
+      if (_skipNames.has(name)) continue;
+      const bStart = flavorsInner.indexOf('{', fm.index);
+      let d = 0, j = bStart, body = '';
+      for (; j < flavorsInner.length; j++) {
+        if (flavorsInner[j] === '{') d++;
+        else if (flavorsInner[j] === '}') { d--; if (d === 0) { body = flavorsInner.slice(bStart + 1, j); break; } }
+      }
       const suffixMatch = body.match(/applicationIdSuffix\s*=?\s*["']([^"']+)["']/);
       const idMatch     = body.match(/\bapplicationId\b\s*=?\s*["']([^"']+)["']/);
       const appId = idMatch ? idMatch[1] : (baseAppId + (suffixMatch ? suffixMatch[1] : ''));
       detectedVariants.push({ name, applicationId: appId });
+      flavorRe.lastIndex = j + 1;
     }
   }
 
@@ -430,7 +459,7 @@ async function analyzeProject() {
 
   // ── Apply to Modules list ────────────────────────────
   // Prefer existing MODULE_MAP.md (richer data) over Gradle-detected names
-  const existingModuleMap = await tryReadFile(state.dirHandle, 'agent-sdd', 'spec-kit', 'MODULE_MAP.md');
+  const existingModuleMap = await tryReadFile(state.dirHandle, 'agent-sdd-output', 'spec-kit', 'MODULE_MAP.md');
   const parsedModules = existingModuleMap ? parseModuleMapMD(existingModuleMap) : [];
 
   if (parsedModules.length > 0) {
@@ -451,7 +480,7 @@ async function analyzeProject() {
   }
 
   // ── Load existing DATA_MODEL.md ──────────────────────
-  const existingDataModel = await tryReadFile(state.dirHandle, 'agent-sdd', 'spec-kit', 'DATA_MODEL.md');
+  const existingDataModel = await tryReadFile(state.dirHandle, 'agent-sdd-output', 'spec-kit', 'DATA_MODEL.md');
   if (existingDataModel) {
     const { entities } = parseDataModelMD(existingDataModel);
     const entList = document.getElementById('entities-list');
@@ -756,6 +785,7 @@ function buildArchitectureScreen(fp) {
         ${pill('MVC','MVC','arch','radio')}
         ${pill('Clean Architecture','Clean','arch','radio')}
         ${pill('Clean + MVI','Clean+MVI','arch','radio')}
+        ${otherPill('arch','radio')}
       </div>
     </div>
 
@@ -767,6 +797,7 @@ function buildArchitectureScreen(fp) {
         ${pill('Koin','Koin','di','radio')}
         ${pill('Manual','Manual','di','radio')}
         ${pill('None','None','di','radio')}
+        ${otherPill('di','radio')}
       </div>
     </div>
 
@@ -778,6 +809,7 @@ function buildArchitectureScreen(fp) {
         ${pill('RxJava 3','RxJava3','async')}
         ${pill('AsyncTask (legacy)','AsyncTask','async')}
         ${pill('Threads','Threads','async')}
+        ${otherPill('async')}
       </div>
       <p class="approach-hint">Select <strong>each approach</strong> above to get a separate card. One card = one approach. Use module chips to specify which modules use it.</p>
       <div class="approach-detail" id="arch-async-detail"></div>
@@ -790,6 +822,7 @@ function buildArchitectureScreen(fp) {
         ${pill('LiveData','LiveData','state')}
         ${pill('RxSubjects','RxSubjects','state')}
         ${pill('MVI Store','MVI','state')}
+        ${otherPill('state')}
       </div>
       <p class="approach-hint">Select <strong>each approach</strong> above to get a separate card. One card = one approach. Use module chips to specify which modules use it.</p>
       <div class="approach-detail" id="arch-state-detail"></div>
@@ -822,6 +855,7 @@ function buildArchitectureScreen(fp) {
         ${pill('Manual Fragments','ManualFragments','nav','radio')}
         ${pill('Mixed','MixedNav','nav','radio')}
         ${pill('Compose Navigation','ComposeNav','nav','radio')}
+        ${otherPill('nav','radio')}
       </div>
     </div>
 
@@ -832,6 +866,7 @@ function buildArchitectureScreen(fp) {
         ${pill('OkHttp','OkHttp','network')}
         ${pill('Ktor','Ktor','network')}
         ${pill('Volley','Volley','network')}
+        ${otherPill('network')}
       </div>
       <div class="form-row" style="margin-top:8px;display:flex;gap:12px">
         <input type="text" id="arch-base-url" placeholder="Strategy only, not the URL — e.g. per-environment via BuildConfig.BASE_URL" oninput="updatePreview('architecture')" style="flex:1">
@@ -847,6 +882,7 @@ function buildArchitectureScreen(fp) {
         ${pill('SharedPreferences','SharedPrefs','storage')}
         ${pill('SQLite','SQLite','storage')}
         ${pill('Realm','Realm','storage')}
+        ${otherPill('storage')}
       </div>
       <div class="form-row" style="margin-top:8px">
         <textarea id="arch-storage-usage" rows="2" placeholder="One line per approach e.g.&#10;DataStore — user preferences, session tokens&#10;Realm — order history cache" oninput="updatePreview('architecture')"></textarea>
@@ -863,6 +899,7 @@ function buildArchitectureScreen(fp) {
         ${pill('Glide','Glide','img','radio')}
         ${pill('Picasso','Picasso','img','radio')}
         ${pill('None','NoneImg','img','radio')}
+        ${otherPill('img','radio')}
       </div>
       <div class="form-row" style="margin-top:8px">
         <textarea id="arch-img-usage" rows="2" placeholder="Where used — e.g. product images, restaurant logos, user avatars" oninput="updatePreview('architecture')"></textarea>
@@ -2052,12 +2089,41 @@ function buildMigrationsScreen(fp) {
         </div>`).join('')}
       </div>
     </div>
+    <div class="form-section" style="margin-top:24px">
+      <h3>Custom Rules <span style="font-size:12px;font-weight:400;color:var(--text-muted)">— project-specific patterns not covered above</span></h3>
+      <p style="color:var(--text-dim);font-size:13px;margin-bottom:12px">
+        Add any rule the agent should follow when touching files with your own legacy or project-specific patterns — e.g. a custom image loader, an internal networking layer, or a design system component.
+      </p>
+      <div class="dynamic-list" id="custom-rules-list"></div>
+      <button class="btn btn-secondary" style="margin-top:8px" onclick="addCustomRuleRow()">+ Add Custom Rule</button>
+      <input type="hidden" id="custom-rule-count" value="0">
+    </div>
     <div class="btn-actions">
       <button class="btn btn-secondary" onclick="showPreview(generateMigrationsMD()); document.getElementById('previewPanel').classList.remove('collapsed')">👁 Preview MD</button>
       <button class="btn btn-success" onclick="saveStep('migrations')">💾 Save MIGRATION_RULES.md</button>
       <button class="btn btn-secondary" onclick="goTo('modules')">Next →</button>
     </div>
   </div>`;
+}
+
+let customRuleCounter = 0;
+function addCustomRuleRow(defaults = {}) {
+  const id = ++customRuleCounter;
+  const row = document.createElement('div');
+  row.className = 'dynamic-item'; row.id = 'custom-rule-row-' + id;
+  row.innerHTML = `
+    <button class="remove-btn" onclick="document.getElementById('custom-rule-row-${id}').remove(); updatePreview('migrations'); saveDraft()">✕</button>
+    <div class="form-row">
+      <label>Rule title</label>
+      <input type="text" id="custom-rule-title-${id}" value="${esc(defaults.title||'')}" placeholder="e.g. Glide → Coil, Custom Logger" oninput="updatePreview('migrations');saveDraft()" style="font-size:13px">
+    </div>
+    <div class="form-row">
+      <label style="align-self:flex-start;padding-top:4px">Rule body</label>
+      <textarea id="custom-rule-body-${id}" rows="4" placeholder="Describe what the agent should do when touching files that use this pattern. Use the same style as the rules above — bullet points work well." oninput="updatePreview('migrations');saveDraft()" style="font-size:12px;font-family:var(--mono);resize:vertical;width:100%">${esc(defaults.body||'')}</textarea>
+    </div>`;
+  document.getElementById('custom-rules-list').appendChild(row);
+  const countEl = document.getElementById('custom-rule-count');
+  if (countEl) { countEl.value = customRuleCounter; saveDraft(); }
 }
 
 function toggleMigScope(id) {
@@ -2222,6 +2288,15 @@ ${scope('asynctask')}
 
   const hasAny = ['java','livedata','rxjava','mvp','nvm','retrofit','sharedpref','asynctask'].some(has);
 
+  // Collect custom rules
+  const customBlocks = [];
+  document.querySelectorAll('[id^="custom-rule-row-"]').forEach(row => {
+    const idNum = row.id.replace('custom-rule-row-', '');
+    const title = document.getElementById(`custom-rule-title-${idNum}`)?.value.trim();
+    const body  = document.getElementById(`custom-rule-body-${idNum}`)?.value.trim();
+    if (title || body) customBlocks.push(`\n## ${title || 'Custom Rule'}\n\n${body || ''}\n`);
+  });
+
   return `# Migration Rules
 # ─────────────────────────────────────────────────────────────────────────────
 # HUMAN-AUTHORED. Agent reads and applies automatically. Never modifies.
@@ -2264,6 +2339,7 @@ The agent does not apply migration rules to code it did not add or modify.
 If the agent notices a violation in untouched code, it logs it in the completion
 report under "Follow-up recommended" with the file path and line number.
 It does not touch it.
+${customBlocks.length > 0 ? '\n---\n' + customBlocks.join('\n---\n') : ''}
 `;
 }
 
@@ -3164,6 +3240,9 @@ const PLATFORM = {
     renderApproachRows('state');
     refreshModuleChips();
     updateArchProgress();
+    // Recreate custom rule rows so restoreDraft can fill their inputs/textareas
+    const count = parseInt(document.getElementById('custom-rule-count')?.value || '0', 10);
+    for (let i = 0; i < count; i++) addCustomRuleRow();
   },
 
   onConfigLoaded: (text) => {

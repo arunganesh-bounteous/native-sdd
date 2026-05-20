@@ -8,10 +8,14 @@
 
 You are an AI agent executing a development task on a software project.
 This SDD skeleton gives you everything you need to work accurately and safely:
-- Project configuration (`project.config.md`)
-- Architecture knowledge (`spec-kit/`)
-- Per-module living docs (`context/`)
-- The task to execute (`tasks/<TICKET-ID>.md`)
+- Project configuration (`agent-sdd-output/project.config.md`)
+- Architecture knowledge (`agent-sdd-output/spec-kit/`)
+- Per-module living docs (`agent-sdd-output/context/`)
+- The task to execute (`agent-sdd-output/tasks/<TICKET-ID>.md`)
+
+**Directory layout:**
+- `agent-sdd/` — the skeleton tool (wizard, templates, this file). Read-only — never modify anything here.
+- `agent-sdd-output/` — your project's generated spec-kit, context files, and tasks. All agent reads and writes go here.
 
 Your job: read the task MD, load the right context, write the code, update
 the context files, and produce a completion report. Nothing more.
@@ -20,15 +24,15 @@ the context files, and produce a completion report. Nothing more.
 
 ## Step 0 — Read project.config.md
 
-Read `project.config.md` first. Extract:
+Read `agent-sdd-output/project.config.md` first. Extract:
 - `codebase_path` — all source file paths resolve from here
 - `platform` and `primary_language` — governs which conventions apply
 - `default_tests` — Y means write tests unless task says otherwise
 - `branch_convention` — for completion report
 
 **Resolving codebase_path:** If the value starts with `.` (e.g. `..`), it is a
-relative path from the `agent-sdd/` folder. Resolve it to an absolute path before
-using it. Example: if this file is at `/project/agent-sdd/CLAUDE.md` and
+relative path from the `agent-sdd-output/` folder. Resolve it to an absolute path before
+using it. Example: if `agent-sdd-output/` is at `/project/agent-sdd-output/` and
 `codebase_path: ..`, the resolved path is `/project/`.
 
 ---
@@ -71,25 +75,25 @@ Load every tier before reading the task. Do not skip tiers.
 
 | Tier | What to load | Condition |
 |------|-------------|-----------|
-| 1 | `spec-kit/ARCHITECTURE.md` + `spec-kit/MODULE_MAP.md` | Always |
-| 2 | `spec-kit/CONVENTIONS.md` + `spec-kit/MIGRATION_RULES.md` + `spec-kit/TESTING.md` | Always |
-| 3 | `context/_index.md` → match task keywords → load `context/<module>.md` for each match | Always |
-| 4 | Relevant sections of `spec-kit/TECH_DEBT.md` | When touching legacy code or files listed in debt register |
-| 5 | Relevant sections of `spec-kit/DATA_MODEL.md` | When task touches data models, APIs, DB, or network |
+| 1 | `agent-sdd-output/spec-kit/ARCHITECTURE.md` + `agent-sdd-output/spec-kit/MODULE_MAP.md` | Always |
+| 2 | `agent-sdd-output/spec-kit/CONVENTIONS.md` + `agent-sdd-output/spec-kit/MIGRATION_RULES.md` + `agent-sdd-output/spec-kit/TESTING.md` | Always |
+| 3 | `agent-sdd-output/context/_index.md` → match task keywords → load `agent-sdd-output/context/<module>.md` for each match | Always |
+| 4 | Relevant sections of `agent-sdd-output/spec-kit/TECH_DEBT.md` | When touching legacy code or files listed in debt register |
+| 5 | Relevant sections of `agent-sdd-output/spec-kit/DATA_MODEL.md` | When task touches data models, APIs, DB, or network |
 | 6 | Source files listed in the loaded context files that are expected to change | Per task |
 
 **Multi-module tasks:** If the task touches more than one module, load all matching
 context files (Tier 3) before reading any source files.
 
-**Module not in context/:** Check `spec-kit/MODULE_MAP.md` by module name. If still
+**Module not in context/:** Check `agent-sdd-output/spec-kit/MODULE_MAP.md` by module name. If still
 not found, read 5–8 key source files in that area, execute the task, then generate
-a `context/<module>.md` file afterward using `context/TEMPLATE.md`.
+a `agent-sdd-output/context/<module>.md` file afterward using `agent-sdd/context/TEMPLATE.md`.
 
 ---
 
 ## Step 2 — Read the Task MD
 
-Read the task file the developer has provided (e.g., `tasks/[PROJ]-1234.md`).
+Read the task file the developer has provided (e.g., `agent-sdd-output/tasks/[PROJ]-1234.md`).
 Extract:
 - Ticket ID and title
 - Type (Feature / Bug / Refactor / Task)
@@ -112,7 +116,7 @@ If anything is ambiguous, stop here (see Ambiguity Protocol below).
 
 **Affected modules:** [list each module]
 
-**Context files loaded:** [list each context/<module>.md]
+**Context files loaded:** [list each agent-sdd-output/context/<module>.md]
 
 **Files to create:**
 - path/to/NewFile.kt — [one-line reason]
@@ -150,8 +154,8 @@ If the task MD is silent AND `default_tests: N` → ask: "Do you want tests for 
 
 ## Step 5 — Execute
 
-Write code following `spec-kit/CONVENTIONS.md` and `spec-kit/MIGRATION_RULES.md` exactly.
-Apply `spec-kit/TESTING.md` for all test files.
+Write code following `agent-sdd-output/spec-kit/CONVENTIONS.md` and `agent-sdd-output/spec-kit/MIGRATION_RULES.md` exactly.
+Apply `agent-sdd-output/spec-kit/TESTING.md` for all test files.
 
 **Execution order:**
 1. Create new files first (models, repositories, use cases)
@@ -223,7 +227,7 @@ Only proceed to Step 7 if verdict is **PASS**.
 
 ## Step 7 — Update Context Files
 
-After verification passes, update `context/<module>.md` for every module you touched:
+After verification passes, update `agent-sdd-output/context/<module>.md` for every module you touched:
 - Add new files to the Key Files table
 - Update State Management if ViewModel state changed
 - Update Known Debt if new debt was introduced
@@ -231,7 +235,7 @@ After verification passes, update `context/<module>.md` for every module you tou
 - Update "What the Agent Should Know" with any non-obvious discoveries
 - Set "Last updated" to today's date and the ticket ID
 
-If a module had no context file, create one using `context/TEMPLATE.md`.
+If a module had no context file, create one using `agent-sdd/context/TEMPLATE.md`.
 
 ---
 
@@ -249,7 +253,7 @@ Use this exact format:
 - path/to/ExistingFile.kt — [one line: what changed and why]
 
 ### Context files updated
-- context/[module].md — [one line: what was added or changed]
+- agent-sdd-output/context/[module].md — [one line: what was added or changed]
 
 ### Tests written
 - path/to/NewFileTest.kt — [scenarios covered]
@@ -282,7 +286,8 @@ Use this exact format:
 These rules have no exceptions. Do not reason around them.
 
 ### Scope rules
-- **Never modify `spec-kit/` files.** These are read-only inputs — some are AI artifacts generated by the wizard, some are human-authored specs. The agent reads both and modifies neither.
+- **Never modify `agent-sdd/` files.** This is the skeleton submodule — wizard, templates, this CLAUDE.md. Read-only for everyone including the agent.
+- **Never modify `agent-sdd-output/spec-kit/` files.** These are read-only inputs — some are AI artifacts generated by the wizard, some are human-authored specs. The agent reads both and modifies neither.
 - **Never create new top-level directories** in the codebase without explicit instruction.
 - **Never fix tech debt outside task scope.** Log it in the completion report instead.
 - **Never refactor code the task did not ask you to touch.** Diffs must be reviewable.
@@ -298,8 +303,23 @@ These rules have no exceptions. Do not reason around them.
 - No `lateinit var` except for Hilt-injected fields.
 
 ### For non-Android platforms
-The rules above are Android/Kotlin defaults. `spec-kit/CONVENTIONS.md` defines the
+The rules above are Android/Kotlin defaults. `agent-sdd-output/spec-kit/CONVENTIONS.md` defines the
 equivalent rules for your platform. CONVENTIONS.md takes precedence over this list.
+
+---
+
+## Runtime Protection (Claude Code Hooks)
+
+The project's `.claude/settings.json` (installed from `agent-sdd/hooks/`) enforces protection rules that run **before** this file is even read:
+
+| Layer | What it enforces |
+|-------|-----------------|
+| `permissions.deny` | Blocks all writes to `agent-sdd/**`, `agent-sdd-output/spec-kit/**`, generated files (`.xcodeproj`, `R.java`, `BuildConfig.java`, `*.generated.kt`, `build/`) |
+| `protected-paths.sh` (PreToolUse) | Script-level catch for edge cases the glob patterns miss |
+| `lint-gate.sh` (PostToolUse) | Runs ktlint (Android) or SwiftLint (iOS) after every file edit |
+| `done-gate.sh` (Stop) | Audits `git diff` on session end and warns about any protected-file touches |
+
+These hooks are **deterministic** — they run regardless of what this file says. CLAUDE.md is the fallback for behavior the hooks don't cover (logic, naming, structure). Never attempt to write to protected paths; the hook will block it and the task will stall.
 
 ---
 

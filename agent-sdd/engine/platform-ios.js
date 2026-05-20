@@ -349,20 +349,69 @@ async function analyzeProject() {
   const src    = ((packageSwift || '') + '\n' + (podfile || '')).toLowerCase();
   const hasSrc = (...terms) => terms.some(t => src.includes(t.toLowerCase()));
 
-  // ── Step 4: Parse project.pbxproj for bundle ID + configs ─
+  // ── Step 4: Parse project.pbxproj for literal bundle IDs ──
   let mainBundleId = '';
   let buildConfigs = [];
+  const configBundleMap = {}; // configName → bundle ID (from pbxproj or xcconfig)
   if (pbxproj) {
-    const allIds = [...pbxproj.matchAll(/PRODUCT_BUNDLE_IDENTIFIER\s*=\s*([^\s;]+)\s*;/g)]
-      .map(m => m[1].trim())
-      .filter(id => id.includes('.') &&
-        !/(test|widget|extension|watch|notification|clip)/i.test(id));
-    mainBundleId = allIds[0] || '';
-
-    // XCBuildConfiguration names (Debug, Release, Staging, etc.)
-    const cfgMatches = [...pbxproj.matchAll(/isa\s*=\s*XCBuildConfiguration[\s\S]*?name\s*=\s*([A-Za-z][A-Za-z0-9\-_ ]+?)\s*;/g)];
-    buildConfigs = [...new Set(cfgMatches.map(m => m[1].trim()))].filter(n => n.length < 30);
+    // Split on XCBuildConfiguration markers. The buildSettings block closes with };
+    // before name = ...; so we split at the first }; to find each part separately.
+    for (const chunk of pbxproj.split('isa = XCBuildConfiguration;').slice(1)) {
+      const splitAt  = chunk.indexOf('};');
+      if (splitAt === -1) continue;
+      const settings = chunk.slice(0, splitAt);
+      const after    = chunk.slice(splitAt);
+      const nameM    = after.match(/\bname\s*=\s*"?([^";\n]+)"?\s*;/);
+      const idM      = settings.match(/PRODUCT_BUNDLE_IDENTIFIER\s*=\s*([^\s$(\n;]+)\s*;/);
+      if (nameM && idM) {
+        const cfgName  = nameM[1].trim();
+        const bundleId = idM[1].trim();
+        // Skip variable references ($BUNDLE_ID, $(VAR)) — xcconfig scan handles these
+        if (bundleId.includes('.') && !bundleId.startsWith('$') &&
+            !/(test|widget|extension|watch|notification|clip)/i.test(bundleId))
+          configBundleMap[cfgName] = bundleId;
+      }
+    }
   }
+
+  // ── Step 4b: Scan xcconfig files for BUNDLE_ID / PRODUCT_BUNDLE_IDENTIFIER ─
+  // Many iOS projects use $BUNDLE_ID in pbxproj and store real values in xcconfig files.
+  const _skipXcc = new Set(['Pods', 'node_modules', 'DerivedData', 'build', '.build', '.git']);
+  async function _scanXcconfigs(dh, depth) {
+    if (depth <= 0) return;
+    try {
+      for await (const [name, handle] of dh) {
+        if (handle.kind === 'file' && name.endsWith('.xcconfig')) {
+          try {
+            const text = await (await handle.getFile()).text();
+            const idM  = text.match(/^(?:BUNDLE_ID|PRODUCT_BUNDLE_IDENTIFIER)\s*=\s*([^\s$(\n][^\n]*)/m);
+            if (idM) {
+              const bundleId = idM[1].trim();
+              if (bundleId.includes('.') && !bundleId.includes('$') &&
+                  !/(test|widget|extension|watch|notification|clip)/i.test(bundleId))
+                configBundleMap[name.replace('.xcconfig', '')] = bundleId;
+            }
+          } catch {}
+        } else if (handle.kind === 'directory' && !_skipXcc.has(name) && !name.startsWith('.')) {
+          await _scanXcconfigs(handle, depth - 1);
+        }
+      }
+    } catch {}
+  }
+  await _scanXcconfigs(state.dirHandle, 6);
+
+  // mainBundleId: prefer AppStore (production), then Release, then first non-dev ID
+  mainBundleId = configBundleMap['AppStore']
+    || configBundleMap['AppStore-Release']
+    || configBundleMap['Release']
+    || Object.values(configBundleMap).find(id => !/(develop|debug|stag|preprod|uat)/i.test(id))
+    || Object.values(configBundleMap)[0]
+    || '';
+
+  // Unique base config names for scheme fallback (strip -Debug/-Release variants)
+  buildConfigs = [...new Set(
+    Object.keys(configBundleMap).map(n => n.replace(/-(Debug|Release)$/, ''))
+  )].filter(n => n.length < 30);
 
   // ── Step 5: Read xcscheme names ──────────────────────────
   let schemeNames = [];
@@ -459,17 +508,34 @@ async function analyzeProject() {
   const schemeList = document.getElementById('cfg-schemes-list');
   if (schemeList) { schemeList.innerHTML = ''; schemeCounter = 0; }
 
+  // Look up actual bundle ID for a scheme name from pbxproj config map.
+  // Tries: exact → SchemeName-Release → SchemeName-Debug → naive suffix fallback.
+  function resolveSchemeBundle(name) {
+    if (configBundleMap[name])               return configBundleMap[name];
+    if (configBundleMap[name + '-Release'])  return configBundleMap[name + '-Release'];
+    if (configBundleMap[name + '-Debug'])    return configBundleMap[name + '-Debug'];
+    // Case-insensitive prefix match
+    const nl = name.toLowerCase();
+    for (const [cfg, id] of Object.entries(configBundleMap))
+      if (cfg.toLowerCase().startsWith(nl)) return id;
+    // Last resort: naive suffix on mainBundleId
+    if (!mainBundleId) return '';
+    if (nl.includes('debug'))                return mainBundleId + '.debug';
+    if (nl.includes('stag') || nl.includes('uat')) return mainBundleId + '.staging';
+    return mainBundleId;
+  }
+
   const schemeSrc = schemeNames.length > 0 ? schemeNames : buildConfigs;
   if (schemeSrc.length > 0) {
     schemeSrc.forEach(name => {
-      const nl   = name.toLowerCase();
-      const sfx  = nl.includes('debug') || nl === 'debug'     ? '.debug'
-                 : nl.includes('stag')  || nl.includes('uat') ? '.staging'
-                 :                                               '';
+      const nl = name.toLowerCase();
       addSchemeRow({
         name,
-        bundleId: mainBundleId ? mainBundleId + sfx : '',
-        note: nl.includes('debug') ? 'Development build' : nl.includes('stag') || nl.includes('uat') ? 'Staging build' : nl.includes('release') || nl.includes('prod') ? 'Production build' : '',
+        bundleId: resolveSchemeBundle(name),
+        note: nl.includes('debug') ? 'Development build'
+            : nl.includes('stag') || nl.includes('uat') ? 'Staging build'
+            : nl.includes('release') || nl.includes('prod') ? 'Production build'
+            : '',
       });
     });
   } else {
@@ -517,7 +583,7 @@ async function analyzeProject() {
   if (hasUIKit && hasSwiftUI)  setToggle('uikit', true);
 
   // ── Step 13: Modules list — prefer existing MODULE_MAP.md ──
-  const existingModuleMap = await tryReadFile(state.dirHandle, 'agent-sdd', 'spec-kit', 'MODULE_MAP.md');
+  const existingModuleMap = await tryReadFile(state.dirHandle, 'agent-sdd-output', 'spec-kit', 'MODULE_MAP.md');
   const parsedModules = existingModuleMap ? parseModuleMapMD(existingModuleMap) : [];
 
   if (parsedModules.length > 0) {
@@ -543,7 +609,7 @@ async function analyzeProject() {
   }
 
   // ── Load existing DATA_MODEL.md ──────────────────────
-  const existingDataModel = await tryReadFile(state.dirHandle, 'agent-sdd', 'spec-kit', 'DATA_MODEL.md');
+  const existingDataModel = await tryReadFile(state.dirHandle, 'agent-sdd-output', 'spec-kit', 'DATA_MODEL.md');
   if (existingDataModel) {
     const { entities } = parseDataModelMD(existingDataModel);
     const entList = document.getElementById('entities-list');
@@ -825,6 +891,7 @@ function buildArchitectureScreen(fp) {
         ${pill('VIPER','VIPER','arch','radio')}
         ${pill('TCA','TCA','arch','radio')}
         ${pill('Clean Architecture','Clean','arch','radio')}
+        ${otherPill('arch','radio')}
       </div>
     </div>
 
@@ -836,6 +903,7 @@ function buildArchitectureScreen(fp) {
         ${pill('Swinject','Swinject','di','radio')}
         ${pill('Needle','Needle','di','radio')}
         ${pill('Factory','Factory','di','radio')}
+        ${otherPill('di','radio')}
       </div>
     </div>
 
@@ -845,6 +913,7 @@ function buildArchitectureScreen(fp) {
         ${pill('async/await','async/await','async')}
         ${pill('Combine','Combine','async')}
         ${pill('RxSwift','RxSwift','async')}
+        ${otherPill('async')}
         ${pill('GCD','GCD','async')}
         ${pill('OperationQueue','OperationQueue','async')}
       </div>
@@ -859,6 +928,7 @@ function buildArchitectureScreen(fp) {
         ${pill('ObservableObject','ObservableObject','state')}
         ${pill('CurrentValueSubject','CurrentValueSubject','state')}
         ${pill('RxRelay','RxRelay','state')}
+        ${otherPill('state')}
       </div>
       <p class="approach-hint">Select <strong>each approach</strong> to get a separate card.</p>
       <div class="approach-detail" id="arch-state-detail"></div>
@@ -891,6 +961,7 @@ function buildArchitectureScreen(fp) {
         ${pill('Coordinator','Coordinator','nav','radio')}
         ${pill('UINavigationController','UINavController','nav','radio')}
         ${pill('Mixed','MixedNav','nav','radio')}
+        ${otherPill('nav','radio')}
       </div>
     </div>
 
@@ -900,6 +971,7 @@ function buildArchitectureScreen(fp) {
         ${pill('URLSession','URLSession','network')}
         ${pill('Alamofire','Alamofire','network')}
         ${pill('Moya','Moya','network')}
+        ${otherPill('network')}
       </div>
       <div class="form-row" style="margin-top:8px;display:flex;gap:12px">
         <input type="text" id="arch-base-url" placeholder="Strategy only — e.g. per-environment via InfoPlist BASE_URL" oninput="updatePreview('architecture')" style="flex:1">
@@ -915,6 +987,7 @@ function buildArchitectureScreen(fp) {
         ${pill('Realm','Realm','storage')}
         ${pill('UserDefaults','UserDefaults','storage')}
         ${pill('Keychain','Keychain','storage')}
+        ${otherPill('storage')}
       </div>
       <div class="form-row" style="margin-top:8px">
         <textarea id="arch-storage-usage" rows="2" placeholder="One line per approach e.g.&#10;SwiftData — user preferences, order history&#10;Keychain — auth tokens, secure credentials" oninput="updatePreview('architecture')"></textarea>
@@ -931,6 +1004,7 @@ function buildArchitectureScreen(fp) {
         ${pill('SDWebImage','SDWebImage','img','radio')}
         ${pill('Nuke','Nuke','img','radio')}
         ${pill('None','NoneImg','img','radio')}
+        ${otherPill('img','radio')}
       </div>
       <div class="form-row" style="margin-top:8px">
         <textarea id="arch-img-usage" rows="2" placeholder="Where used — e.g. product images, restaurant logos, user avatars" oninput="updatePreview('architecture')"></textarea>
@@ -1772,12 +1846,41 @@ function buildMigrationsScreen(fp) {
         </div>`).join('')}
       </div>
     </div>
+    <div class="form-section" style="margin-top:24px">
+      <h3>Custom Rules <span style="font-size:12px;font-weight:400;color:var(--text-muted)">— project-specific patterns not covered above</span></h3>
+      <p style="color:var(--text-dim);font-size:13px;margin-bottom:12px">
+        Add any rule the agent should follow when touching files with your own legacy or project-specific patterns — e.g. a custom networking layer, an internal design system, or a third-party SDK wrapper.
+      </p>
+      <div class="dynamic-list" id="custom-rules-list"></div>
+      <button class="btn btn-secondary" style="margin-top:8px" onclick="addCustomRuleRow()">+ Add Custom Rule</button>
+      <input type="hidden" id="custom-rule-count" value="0">
+    </div>
     <div class="btn-actions">
       <button class="btn btn-secondary" onclick="showPreview(generateMigrationsMD()); document.getElementById('previewPanel').classList.remove('collapsed')">👁 Preview MD</button>
       <button class="btn btn-success" onclick="saveStep('migrations')">💾 Save MIGRATION_RULES.md</button>
       <button class="btn btn-secondary" onclick="goTo('modules')">Next →</button>
     </div>
   </div>`;
+}
+
+let customRuleCounter = 0;
+function addCustomRuleRow(defaults = {}) {
+  const id = ++customRuleCounter;
+  const row = document.createElement('div');
+  row.className = 'dynamic-item'; row.id = 'custom-rule-row-' + id;
+  row.innerHTML = `
+    <button class="remove-btn" onclick="document.getElementById('custom-rule-row-${id}').remove(); updatePreview('migrations'); saveDraft()">✕</button>
+    <div class="form-row">
+      <label>Rule title</label>
+      <input type="text" id="custom-rule-title-${id}" value="${esc(defaults.title||'')}" placeholder="e.g. Kingfisher → SDWebImage, Custom Logger" oninput="updatePreview('migrations');saveDraft()" style="font-size:13px">
+    </div>
+    <div class="form-row">
+      <label style="align-self:flex-start;padding-top:4px">Rule body</label>
+      <textarea id="custom-rule-body-${id}" rows="4" placeholder="Describe what the agent should do when touching files that use this pattern. Use the same style as the rules above — bullet points work well." oninput="updatePreview('migrations');saveDraft()" style="font-size:12px;font-family:var(--mono);resize:vertical;width:100%">${esc(defaults.body||'')}</textarea>
+    </div>`;
+  document.getElementById('custom-rules-list').appendChild(row);
+  const countEl = document.getElementById('custom-rule-count');
+  if (countEl) { countEl.value = customRuleCounter; saveDraft(); }
 }
 
 function toggleMigScope(id) {
@@ -1935,6 +2038,15 @@ ${scope('userdef')}
 
   const hasAny = ['objc','uikit','combine','rxswift','callbacks','delegates','singleton','userdef'].some(has);
 
+  // Collect custom rules
+  const customBlocks = [];
+  document.querySelectorAll('[id^="custom-rule-row-"]').forEach(row => {
+    const idNum = row.id.replace('custom-rule-row-', '');
+    const title = document.getElementById(`custom-rule-title-${idNum}`)?.value.trim();
+    const body  = document.getElementById(`custom-rule-body-${idNum}`)?.value.trim();
+    if (title || body) customBlocks.push(`\n## ${title || 'Custom Rule'}\n\n${body || ''}\n`);
+  });
+
   return `# Migration Rules
 # ─────────────────────────────────────────────────────────────────────────────
 # HUMAN-AUTHORED. Agent reads and applies automatically. Never modifies.
@@ -1965,6 +2077,7 @@ ${generateNewScreensTable()}
 The agent does not apply migration rules to code it did not add or modify.
 If the agent notices a violation in untouched code, it logs it in the completion
 report under "Follow-up recommended" with the file path and line number.
+${customBlocks.length > 0 ? '\n---\n' + customBlocks.join('\n---\n') : ''}
 `;
 }
 
@@ -2737,6 +2850,9 @@ const PLATFORM = {
     renderApproachRows('state');
     refreshModuleChips();
     updateArchProgress();
+    // Recreate custom rule rows so restoreDraft can fill their inputs/textareas
+    const count = parseInt(document.getElementById('custom-rule-count')?.value || '0', 10);
+    for (let i = 0; i < count; i++) addCustomRuleRow();
   },
 
   onConfigLoaded: (text) => {

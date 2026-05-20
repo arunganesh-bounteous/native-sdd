@@ -191,6 +191,11 @@ function restoreDraft() {
       }
       pill.classList.add('selected');
       if (input) input.checked = true;
+      // Show "Other" expand span if this is an Other pill
+      if (value === '__other__') {
+        const expand = pill.querySelector('.other-expand');
+        if (expand) expand.style.display = 'inline';
+      }
     });
   });
 
@@ -256,12 +261,12 @@ async function grantFolder() {
     badge.className = 'folder-badge granted';
     showToast('Project folder set: ' + handle.name + ' — analysing…', 'success');
 
-    // Auto-set codebase_path to '..' — always correct when agent-sdd/ is inside project root
+    // Auto-set codebase_path to '..' — always correct when agent-sdd-output/ is inside project root
     const pathEl = document.getElementById('cfg-codebase-path');
     if (pathEl && !pathEl.value) pathEl.value = '..';
 
-    // Try to load existing agent-sdd/project.config.md and pre-fill the form
-    const existing = await tryReadFile(handle, 'agent-sdd', 'project.config.md');
+    // Try to load existing agent-sdd-output/project.config.md and pre-fill the form
+    const existing = await tryReadFile(handle, 'agent-sdd-output', 'project.config.md');
     if (existing) loadExistingConfig(existing);
 
     // Platform hook — e.g. analyzeProject()
@@ -317,10 +322,10 @@ async function countSourceFiles(dirHandle, maxDepth = 4) {
 async function saveFile(relativePath, content) {
   if (!state.dirHandle) { showToast('Select a project folder first', 'error'); return false; }
   try {
-    // Support both: project root selected (agent-sdd/ created inside) or agent-sdd/ selected directly.
-    const sddDir = state.dirHandle.name === 'agent-sdd'
+    // Support both: project root selected (agent-sdd-output/ created inside) or agent-sdd-output/ selected directly.
+    const sddDir = state.dirHandle.name === 'agent-sdd-output'
       ? state.dirHandle
-      : await state.dirHandle.getDirectoryHandle('agent-sdd', { create: true });
+      : await state.dirHandle.getDirectoryHandle('agent-sdd-output', { create: true });
 
     const parts = relativePath.split('/');
     let dir = sddDir;
@@ -349,7 +354,7 @@ function downloadFallback(filename, content) {
 async function handleSave(stepId, filename, content) {
   // No folder selected yet — prompt the user to pick one before saving
   if (hasFSA && !state.dirHandle) {
-    showToast('Select your project root or agent-sdd/ folder to save directly…', 'info');
+    showToast('Select your project root or agent-sdd-output/ folder to save directly…', 'info');
     try {
       const handle = await window.showDirectoryPicker();
       state.dirHandle = handle;
@@ -521,6 +526,16 @@ function pill(name, value, group, type = 'check') {
   </label>`;
 }
 
+// "Other" pill — expands an inline text input when selected.
+// Use for any pill group where a project might use a library not in the hardcoded list.
+function otherPill(group, type = 'check') {
+  const id = group + '___other__';
+  return `<label class="${type}-pill other-pill" id="pill-${id}" onclick="event.preventDefault();toggleOtherPill(this,'${group}','${type}')">
+    <input type="${type === 'radio' ? 'radio' : 'checkbox'}" name="${group}" value="__other__">
+    Other<span class="other-expand" style="display:none">:&nbsp;<input type="text" class="other-text-input" id="other-input-${group}" placeholder="specify…" onclick="event.stopPropagation()" oninput="updatePreview(state.current);saveDraft()" style="border:none;background:transparent;outline:none;font:inherit;color:inherit;width:90px;margin-left:2px"></span>
+  </label>`;
+}
+
 function togglePill(el, group, value, type) {
   if (type === 'radio') {
     document.querySelectorAll(`[id^="pill-${group}_"]`).forEach(p => p.classList.remove('selected'));
@@ -539,20 +554,53 @@ function togglePill(el, group, value, type) {
   saveDraft();
 }
 
+function toggleOtherPill(el, group, type) {
+  togglePill(el, group, '__other__', type);
+  const expand = el.querySelector('.other-expand');
+  if (!expand) return;
+  const selected = el.classList.contains('selected');
+  expand.style.display = selected ? 'inline' : 'none';
+  if (selected) el.querySelector('.other-text-input')?.focus();
+}
+
 function getPills(group) {
   return Array.from(document.querySelectorAll(`[id^="pill-${group}_"]`))
     .filter(p => p.classList.contains('selected'))
-    .map(p => p.querySelector('input').value);
+    .map(p => {
+      const val = p.querySelector('input[type="checkbox"],input[type="radio"]').value;
+      if (val === '__other__') {
+        const txt = (document.getElementById(`other-input-${group}`)?.value || '').trim();
+        return txt || null;
+      }
+      return val;
+    })
+    .filter(Boolean);
 }
 
 function getRadio(group) {
   const sel = document.querySelector(`[id^="pill-${group}_"].selected`);
-  return sel ? sel.querySelector('input').value : '';
+  if (!sel) return '';
+  const val = sel.querySelector('input').value;
+  if (val === '__other__')
+    return (document.getElementById(`other-input-${group}`)?.value || '').trim();
+  return val;
 }
 
+// Selects a pill by value. If the value isn't in the hardcoded list, automatically
+// selects "Other" and fills in the freeform text — used by analyzeProject().
 function selectPill(group, value, type = 'check') {
   const el = document.getElementById(`pill-${group}_${value}`);
-  if (el && !el.classList.contains('selected')) togglePill(el, group, value, type);
+  if (el) {
+    if (!el.classList.contains('selected')) togglePill(el, group, value, type);
+    return;
+  }
+  // Value not in known pills — fall back to "Other"
+  const otherEl = document.getElementById(`pill-${group}___other__`);
+  if (otherEl && value) {
+    if (!otherEl.classList.contains('selected')) toggleOtherPill(otherEl, group, type);
+    const inp = document.getElementById(`other-input-${group}`);
+    if (inp) { inp.value = value; updatePreview(state.current); saveDraft(); }
+  }
 }
 
 // ══════════════════════════════════════════════════════
@@ -585,7 +633,7 @@ async function saveStep(stepId) {
   const protectedSteps = { modules: 'MODULE_MAP.md', datamodel: 'DATA_MODEL.md' };
   if (protectedSteps[stepId] && state.dirHandle) {
     const filename = protectedSteps[stepId];
-    const exists   = await tryReadFile(state.dirHandle, 'agent-sdd', 'spec-kit', filename)
+    const exists   = await tryReadFile(state.dirHandle, 'agent-sdd-output', 'spec-kit', filename)
                   ?? await tryReadFile(state.dirHandle, 'spec-kit', filename);
     if (exists) {
       const go = confirm(
@@ -627,11 +675,11 @@ function init() {
         <div style="display:flex;flex-direction:column;gap:10px">
           ${[
             ['1','Open in Chrome or Edge','Double-click <code>setup-wizard.html</code>. File System Access API requires Chrome or Edge — other browsers will download files instead of saving directly.'],
-            ['2','Select your project folder','Point to your project root (e.g. <code>MyApp/</code>). The wizard auto-detects your Gradle stack and writes all generated files into <code>agent-sdd/</code> inside it.'],
+            ['2','Select your project folder','Point to your project root (e.g. <code>MyApp/</code>). The wizard auto-detects your stack and writes all generated files into <code>agent-sdd-output/</code> inside it.'],
             ['3','Fill in each step','Work through the sidebar steps left to right. Select your stack options, add modules and debt entries. The MD preview on the right updates live.'],
-            ['4','Save each file','Click the green <strong>💾 Save</strong> button on each step. Files are written directly to <code>spec-kit/</code> inside the folder you selected. The sidebar shows ✅ for saved steps.'],
+            ['4','Save each file','Click the green <strong>💾 Save</strong> button on each step. Files are written directly to <code>agent-sdd-output/spec-kit/</code> inside the folder you selected. The sidebar shows ✅ for saved steps.'],
             ['5','Review the generated files','Open the saved <code>.md</code> files in your editor. Replace any <code>[fill in]</code> placeholders with your project-specific details.'],
-            ['6','Run your first agent task','Copy <code>tasks/TASK_TEMPLATE.md</code>, fill in a real ticket, open a Claude session pointing at the skeleton folder, and let the agent execute it.'],
+            ['6','Run your first agent task','Copy <code>agent-sdd/tasks/TASK_TEMPLATE.md</code> to <code>agent-sdd-output/tasks/</code>, fill in a real ticket, open a Claude session, and let the agent execute it.'],
           ].map(([n, title, desc]) => `
           <div style="display:flex;gap:12px;align-items:flex-start">
             <div style="background:var(--accent-dim);color:var(--accent);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px">${n}</div>
@@ -674,7 +722,7 @@ function init() {
       </div>
       <div class="folder-grant" style="max-width:480px;text-align:left">
         <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Select Your Project Root</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;line-height:1.6">Point to your project root folder (e.g. <code>MyApp/</code>). The wizard reads your project files to auto-detect your stack and writes all generated files into <code>agent-sdd/</code> inside it — creating the folder if it doesn't exist yet.</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;line-height:1.6">Point to your project root folder (e.g. <code>MyApp/</code>). The wizard reads your project files to auto-detect your stack and writes all generated files into <code>agent-sdd-output/</code> inside it — creating the folder if it doesn't exist yet.</div>
         <button class="btn btn-primary" onclick="grantFolder()">📂 Select project folder</button>
       </div>
       <br>
@@ -999,7 +1047,7 @@ function choosePlatform(name) {
   }
 
   const script = document.createElement('script');
-  script.src = 'platform-' + name + '.js';
+  script.src = 'engine/platform-' + name + '.js';
 
   script.onload = () => {
     // Remove overlay from DOM after transition

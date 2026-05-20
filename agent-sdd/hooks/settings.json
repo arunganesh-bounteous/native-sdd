@@ -1,0 +1,61 @@
+{
+  "permissions": {
+    "deny": [
+      "Write(agent-sdd/**)",
+      "Edit(agent-sdd/**)",
+      "Write(agent-sdd-output/spec-kit/**)",
+      "Edit(agent-sdd-output/spec-kit/**)",
+      "Write(**/*.xcodeproj/**)",
+      "Edit(**/*.xcodeproj/**)",
+      "Write(**/*.xcworkspace/**)",
+      "Edit(**/*.xcworkspace/**)",
+      "Write(**/BuildConfig.java)",
+      "Edit(**/BuildConfig.java)",
+      "Write(**/R.java)",
+      "Edit(**/R.java)",
+      "Write(**/*.generated.kt)",
+      "Edit(**/*.generated.kt)",
+      "Write(**/build/**)",
+      "Edit(**/build/**)",
+      "Write(**/gradlew)",
+      "Edit(**/gradlew)",
+      "Write(**/gradlew.bat)",
+      "Edit(**/gradlew.bat)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/scripts/protected-paths.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/scripts/lint-gate.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/scripts/done-gate.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
