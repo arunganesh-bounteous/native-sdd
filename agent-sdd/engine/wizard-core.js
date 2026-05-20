@@ -720,13 +720,7 @@ function init() {
             </details>` : ''}
           </div>`).join('')}
       </div>
-      <div class="folder-grant" style="max-width:480px;text-align:left">
-        <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Select Your Project Root</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;line-height:1.6">Point to your project root folder (e.g. <code>MyApp/</code>). The wizard reads your project files to auto-detect your stack and writes all generated files into <code>agent-sdd-output/</code> inside it — creating the folder if it doesn't exist yet.</div>
-        <button class="btn btn-primary" onclick="grantFolder()">📂 Select project folder</button>
-      </div>
-      <br>
-      <button class="btn btn-secondary" onclick="goTo('projectconfig')">Start Setup →</button>
+      <button class="btn btn-primary" onclick="goTo('projectconfig')">Start Setup →</button>
     </div>
   </div>`;
 
@@ -1040,7 +1034,6 @@ function buildTaskScreen(fp) {
 function choosePlatform(name) {
   const overlay = document.getElementById('platformOverlay');
 
-  // Fade the overlay out immediately so the interaction feels snappy
   if (overlay) {
     overlay.style.opacity = '0';
     overlay.style.pointerEvents = 'none';
@@ -1050,19 +1043,76 @@ function choosePlatform(name) {
   script.src = 'engine/platform-' + name + '.js';
 
   script.onload = () => {
-    // Remove overlay from DOM after transition
     setTimeout(() => overlay?.remove(), 320);
-    // PLATFORM global is now set — boot the wizard
-    init();
+    // Skip interstitial on browsers without File System Access API
+    if (!hasFSA) { init(); return; }
+    showFolderInterstitial(name);
   };
 
   script.onerror = () => {
-    // Restore overlay so the user can try again
     if (overlay) { overlay.style.opacity = '1'; overlay.style.pointerEvents = ''; }
     showToast('Could not load platform: ' + name, 'error');
   };
 
   document.head.appendChild(script);
+}
+
+function showFolderInterstitial(platformName) {
+  const label = platformName === 'android' ? 'Android' : 'iOS';
+
+  const el = document.createElement('div');
+  el.id = 'folderInterstitial';
+  el.style.cssText = 'position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:var(--bg)';
+  el.innerHTML = `
+    <div style="text-align:center;max-width:460px;padding:48px 28px">
+      <div style="font-size:48px;margin-bottom:20px">📂</div>
+      <h2 style="margin:0 0 10px;font-size:22px;font-weight:700">Select your ${label} project folder</h2>
+      <p style="color:var(--text-muted);font-size:14px;line-height:1.7;margin:0 0 32px">
+        Point the wizard at your project root so it can auto-detect your stack and save all generated files directly into <code>agent-sdd-output/</code> inside it.
+      </p>
+      <button id="folderInterstitialBtn" class="btn btn-primary" style="width:100%;justify-content:center;font-size:15px;padding:14px 24px;margin-bottom:16px">
+        📂 Select Project Folder
+      </button>
+      <div>
+        <button id="folderInterstitialSkip" style="background:none;border:none;color:var(--text-muted);font-size:13px;cursor:pointer;text-decoration:underline;padding:4px 0">
+          Skip — I'll select it later
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+
+  const dismiss = (handle) => {
+    el.style.transition = 'opacity 0.2s';
+    el.style.opacity = '0';
+    setTimeout(() => {
+      el.remove();
+      init();
+      // Fire post-init folder setup now that DOM is fully built
+      if (handle) {
+        const badge = document.getElementById('sddBadge');
+        if (badge) { badge.textContent = '📂 ' + handle.name; badge.className = 'folder-badge granted'; }
+        const pathEl = document.getElementById('cfg-codebase-path');
+        if (pathEl && !pathEl.value) pathEl.value = '..';
+        tryReadFile(handle, 'agent-sdd-output', 'project.config.md').then(existing => {
+          if (existing) loadExistingConfig(existing);
+        });
+        showToast('Project folder set: ' + handle.name + ' — analysing…', 'success');
+        PLATFORM.onFolderGranted?.();
+      }
+    }, 200);
+  };
+
+  document.getElementById('folderInterstitialBtn').onclick = async () => {
+    try {
+      const handle = await window.showDirectoryPicker();
+      state.dirHandle = handle;
+      dismiss(handle);
+    } catch (e) {
+      if (e.name !== 'AbortError') showToast('Could not access folder — try again.', 'error');
+    }
+  };
+
+  document.getElementById('folderInterstitialSkip').onclick = () => dismiss(null);
 }
 
 // ══════════════════════════════════════════════════════
