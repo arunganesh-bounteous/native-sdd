@@ -950,6 +950,7 @@ const state = {
   dirHandle: null,           // Project root — readwrite. Wizard reads Gradle from here, writes to agent-sdd/ subdirectory.
   saved: {},
   current: 'welcome',
+  dirty: false,              // true when the current step has unsaved changes
   detectedInterceptors: [],  // OkHttp Interceptor class names found in source tree
   detectedModuleDetails: [], // [{name, type, diCol, notes}] from settings.gradle + each module's build.gradle
 };
@@ -1176,7 +1177,64 @@ function buildSidebar() {
 }
 
 function goTo(id) {
+  // Warn if the current step has unsaved changes before navigating away
+  const leavingStep = STEPS.find(s => s.id === state.current);
+  if (state.dirty && leavingStep?.file && id !== state.current) {
+    showUnsavedWarning(leavingStep.label, () => _goTo(id));
+    return;
+  }
+  _goTo(id);
+}
+
+function showUnsavedWarning(stepLabel, onContinue) {
+  const existing = document.getElementById('unsavedWarningModal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'unsavedWarningModal';
+  modal.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;
+    display:flex;align-items:center;justify-content:center;
+  `;
+  modal.innerHTML = `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;
+      padding:24px 28px;max-width:400px;width:90%;box-shadow:0 12px 40px rgba(0,0,0,0.5);">
+      <div style="font-size:20px;margin-bottom:10px">⚠️</div>
+      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px">
+        Unsaved changes
+      </div>
+      <div style="font-size:13px;color:var(--text-dim);margin-bottom:20px;line-height:1.5">
+        <strong>${stepLabel}</strong> has unsaved changes. If you leave now the file won't be written to your project.
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button onclick="document.getElementById('unsavedWarningModal').remove()"
+          style="padding:8px 16px;border-radius:6px;border:1px solid var(--border);
+          background:transparent;color:var(--text);cursor:pointer;font-size:13px">
+          Stay &amp; Save
+        </button>
+        <button id="unsavedContinueBtn"
+          style="padding:8px 16px;border-radius:6px;border:none;
+          background:var(--text-muted);color:var(--bg);cursor:pointer;font-size:13px">
+          Leave without saving
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  document.getElementById('unsavedContinueBtn').addEventListener('click', () => {
+    modal.remove();
+    state.dirty = false;
+    onContinue();
+  });
+
+  // Click outside to dismiss (stay on step)
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+}
+
+function _goTo(id) {
   state.current = id;
+  state.dirty = false;
   document.querySelectorAll('.step-screen').forEach(s => s.classList.remove('active'));
   const screen = document.getElementById('screen-' + id);
   if (screen) screen.classList.add('active');
@@ -1226,6 +1284,11 @@ const DRAFT_KEY = 'sdd-wizard-draft';
 // Snapshot all current form values + selected pills → localStorage.
 let _draftTimer = null;
 function saveDraft() {
+  // Mark dirty synchronously so goTo() sees it even if the user clicks
+  // the sidebar before the debounced write fires (within 300ms).
+  const currentStep = STEPS.find(s => s.id === state.current);
+  if (currentStep?.file) state.dirty = true;
+
   clearTimeout(_draftTimer);
   _draftTimer = setTimeout(() => {
     const draft = { fields: {}, pills: {} };
@@ -1597,6 +1660,7 @@ async function handleSave(stepId, filename, content) {
     const ok = await saveFile(filename, content);
     if (ok) {
       state.saved[stepId] = true;
+      state.dirty = false;
       markDraftSaved(stepId);
       buildSidebar();
       showToast('Saved → ' + filename, 'success');
@@ -1609,6 +1673,7 @@ async function handleSave(stepId, filename, content) {
     // Browser doesn't support FSA (Safari/Firefox) — download is the only option
     downloadFallback(filename, content);
     state.saved[stepId] = true;
+    state.dirty = false;
     markDraftSaved(stepId);
     buildSidebar();
     showToast('Downloaded ' + filename.split('/').pop() + ' (use Chrome/Edge to save directly)', 'info');
@@ -1994,6 +2059,16 @@ function init() {
 // ══════════════════════════════════════════════════════
 
 function goToTaskScreen() {
+  const leavingStep = STEPS.find(s => s.id === state.current);
+  if (state.dirty && leavingStep?.file) {
+    showUnsavedWarning(leavingStep.label, () => _goToTaskScreen());
+    return;
+  }
+  _goToTaskScreen();
+}
+
+function _goToTaskScreen() {
+  state.dirty = false;
   state.current = 'newtask';
   document.querySelectorAll('.step-screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-newtask')?.classList.add('active');
