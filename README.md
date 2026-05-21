@@ -52,6 +52,7 @@ MyProject/                          ← your project root
 │   ├── context/                    ← TEMPLATE.md + _index.md seed files
 │   ├── tasks/                      ← TASK_TEMPLATE.md, BOOTSTRAP_TEMPLATE.md, TASK_GUIDE.md
 │   ├── examples/                   ← reference example task MD
+│   ├── companion.js                ← Option B: local Node.js bridge for running claude CLI from the wizard
 │   └── tutorial*.html              ← SDD workflow guides
 │
 └── agent-sdd-output/               ← created automatically by the wizard on first save
@@ -236,6 +237,31 @@ Keep spec-kit files concise (1–3 pages each) and context files tight (under
 |----------|--------------|-------------------|
 | Android | `engine/platform-android.js` | Gradle scan — Kotlin / Java |
 | iOS | `engine/platform-ios.js` | Source scan — Swift / Objective-C / Mixed |
+
+---
+
+## Companion Script (Run Claude from the Wizard)
+
+`companion.js` is an optional local bridge that lets the wizard launch the Claude Code CLI
+directly from the **▶ Run with Claude** button on the Task screen — no copy-pasting needed.
+
+**Requirements:** Node.js 18+ and the `claude` CLI on your PATH (`npm i -g @anthropic-ai/claude-code`).
+
+```bash
+# From your project root (the folder that contains agent-sdd/):
+node agent-sdd/companion.js
+```
+
+Keep it running while you use the wizard. The wizard polls for it automatically and shows a
+green **● Companion** indicator in the header when it's connected.
+
+When you click **▶ Run with Claude**, the wizard:
+1. Auto-saves the task file to `agent-sdd-output/tasks/<TICKET-ID>.md`
+2. Sends `claude --print --dangerously-skip-permissions "Read agent-sdd/CLAUDE.md and execute <path>"` to the companion
+3. Streams the output into a terminal panel inline
+
+The companion server listens on `http://localhost:127.0.0.1:7842` and accepts CORS requests
+from the local `file://` page. No npm dependencies — pure Node built-ins only.
 
 ---
 

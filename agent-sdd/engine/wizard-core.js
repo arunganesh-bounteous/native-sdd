@@ -38,6 +38,191 @@ const state = {
   detectedModuleDetails: [], // [{name, type, diCol, notes}] from settings.gradle + each module's build.gradle
 };
 
+// ══════════════════════════════════════════════════════
+//  COMPANION  (Option B — local claude CLI bridge)
+//  node agent-sdd/companion.js  →  http://localhost:7842
+// ══════════════════════════════════════════════════════
+const COMPANION_URL    = 'http://localhost:7842';
+let   companionReady   = false;
+let   companionPollTimer = null;
+
+async function pollCompanion() {
+  try {
+    const r = await fetch(COMPANION_URL + '/health', { signal: AbortSignal.timeout(1500) });
+    if (r.ok) {
+      const data = await r.json();
+      // Check whether the companion's project matches the wizard's selected folder.
+      // The browser can't give us the full path, but we can compare folder names.
+      const selectedName   = state.dirHandle?.name || null;
+      const companionName  = data.projectName || null;
+      const mismatch       = selectedName && companionName && selectedName !== companionName;
+      setCompanionStatus(true, data.projectRoot, mismatch ? { selected: selectedName, companion: companionName } : null);
+      return;
+    }
+  } catch (_) { /* not running */ }
+  setCompanionStatus(false);
+}
+
+function setCompanionStatus(connected, projectRoot, mismatch) {
+  // mismatch = null (ok) | { selected, companion } (folder names differ)
+  companionReady = connected && !mismatch;
+  const dot   = document.getElementById('companionDot');
+  const label = document.getElementById('companionLabel');
+  if (!dot || !label) return;
+
+  if (connected && mismatch) {
+    dot.className     = 'companion-dot connecting';   // amber = warning
+    label.textContent = '⚠ Companion';
+    label.className   = 'companion-label';
+    label.style.color = '#fbbf24';
+    label.title       = `Companion project: "${mismatch.companion}"\nWizard project: "${mismatch.selected}"\n\nThey don't match. Run the companion from inside your selected project:\n  node agent-sdd/companion.js\nor pass the path explicitly:\n  node /path/to/agent-sdd/companion.js --project /path/to/${mismatch.selected}`;
+  } else if (connected) {
+    dot.className     = 'companion-dot connected';
+    label.textContent = '● Companion';
+    label.className   = 'companion-label connected';
+    label.style.color = '';
+    label.title       = 'SDD Companion running — project: ' + (projectRoot || '?');
+  } else {
+    dot.className     = 'companion-dot';
+    label.textContent = 'Companion';
+    label.className   = 'companion-label';
+    label.style.color = '';
+    label.title       = 'Companion not running.\nStart it from your project root:\n  node agent-sdd/companion.js';
+  }
+
+  // Refresh run-button state and hint if task screen is visible
+  const btn  = document.getElementById('btnRunClaude');
+  const hint = document.getElementById('companionHint');
+  if (btn) {
+    btn.disabled = !companionReady;
+    if (!connected) {
+      btn.title = 'Start the companion first:\n  node agent-sdd/companion.js';
+    } else if (mismatch) {
+      btn.title = `Companion is pointed at "${mismatch.companion}" but wizard has "${mismatch.selected}" selected — fix the mismatch first`;
+    } else {
+      btn.title = 'Run this task with Claude Code CLI';
+    }
+  }
+  if (hint) {
+    if (!connected) {
+      hint.innerHTML = 'Start the companion from your project root: <code style="font-size:10px;background:var(--surface2);padding:2px 6px;border-radius:3px;border:1px solid var(--border)">node agent-sdd/companion.js</code>';
+      hint.style.display = '';
+    } else if (mismatch) {
+      hint.innerHTML = `⚠ Companion is serving <strong>${mismatch.companion}</strong> but you selected <strong>${mismatch.selected}</strong>. Run companion from inside the selected project.`;
+      hint.style.color  = '#fbbf24';
+      hint.style.display = '';
+    } else {
+      hint.style.display = 'none';
+    }
+  }
+}
+
+function startCompanionPolling() {
+  pollCompanion();
+  companionPollTimer = setInterval(pollCompanion, 5000);
+}
+
+async function runWithClaude() {
+  const id = document.getElementById('task-id')?.value.trim();
+  if (!id) { showToast('Enter a Ticket ID first', 'error'); return; }
+
+  if (!companionReady) {
+    showToast('Companion not ready — check the ⚠ indicator in the header', 'error');
+    return;
+  }
+
+  // Auto-save task before running
+  await saveTask();
+
+  const taskPath = 'agent-sdd-output/tasks/' + id + '.md';
+
+  const terminal  = document.getElementById('claudeTerminal');
+  const body      = document.getElementById('claudeTerminalBody');
+  const spinner   = document.getElementById('terminalSpinner');
+  const titleEl   = document.getElementById('terminalTitle');
+  const runBtn    = document.getElementById('btnRunClaude');
+
+  if (!terminal || !body) return;
+
+  // Reset
+  body.innerHTML = '';
+  terminal.classList.add('visible');
+  if (spinner) spinner.classList.add('active');
+  if (titleEl) titleEl.textContent = 'Running ' + id + '…';
+  if (runBtn)  { runBtn.disabled = true; runBtn.textContent = '⏳ Running…'; }
+  terminal.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  try {
+    const res = await fetch(COMPANION_URL + '/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskPath }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+      appendTerminal(body, err.error || 'Request failed', 'err');
+      if (spinner) spinner.classList.remove('active');
+      if (titleEl) titleEl.textContent = 'Error';
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const dec    = new TextDecoder();
+    let   buf    = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+
+      // Parse SSE lines from buffer
+      const lines = buf.split('\n');
+      buf = lines.pop(); // keep incomplete last line
+      let event = null;
+      for (const line of lines) {
+        if (line.startsWith('event: '))       { event = line.slice(7).trim(); }
+        else if (line.startsWith('data: ')) {
+          try {
+            const payload = JSON.parse(line.slice(6));
+            if (event === 'chunk') {
+              appendTerminal(body, payload.text, payload.stderr ? 'stderr' : '');
+            } else if (event === 'done') {
+              const code = payload.exitCode ?? 0;
+              if (spinner) spinner.classList.remove('active');
+              if (titleEl) titleEl.textContent = code === 0 ? id + ' — Done ✅' : id + ' — Exited ' + code;
+              appendTerminal(body, code === 0 ? '✅ Completed (exit 0)' : '⚠ Exited with code ' + code, 'done');
+            } else if (event === 'error') {
+              appendTerminal(body, payload.message || 'Unknown error', 'err');
+              if (spinner) spinner.classList.remove('active');
+              if (titleEl) titleEl.textContent = 'Error';
+            }
+          } catch (_) { /* malformed JSON — skip */ }
+          event = null;
+        }
+      }
+
+      // Auto-scroll terminal
+      body.scrollTop = body.scrollHeight;
+    }
+  } catch (err) {
+    appendTerminal(body, 'Connection failed: ' + err.message, 'err');
+    if (spinner) spinner.classList.remove('active');
+    if (titleEl) titleEl.textContent = 'Connection error';
+  } finally {
+    if (runBtn) { runBtn.disabled = !companionReady; runBtn.textContent = '▶ Run with Claude'; }
+  }
+}
+
+function appendTerminal(body, text, type) {
+  if (!body || !text) return;
+  const span = document.createElement('span');
+  span.className = type === 'stderr' ? 't-stderr' : type === 'done' ? 't-done' : type === 'err' ? 't-err' : '';
+  span.textContent = text;
+  body.appendChild(span);
+  body.scrollTop = body.scrollHeight;
+}
+
 const STEPS = [
   { id: 'welcome', icon: '👋', label: 'Welcome', file: null },
   { id: 'done',    icon: '✅', label: 'Done',    file: null },
@@ -1022,6 +1207,32 @@ function buildTaskScreen(fp) {
         <button class="btn btn-secondary" onclick="resetTaskForm()">↺ New Task</button>
       </div>
 
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <div>
+            <button class="btn-run-claude" id="btnRunClaude" onclick="runWithClaude()" disabled>
+              ▶ Run with Claude
+            </button>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);line-height:1.5" id="companionHint">
+            Start the companion first:
+            <code style="font-size:10px;background:var(--surface2);padding:2px 6px;border-radius:3px;border:1px solid var(--border)">node agent-sdd/companion.js</code>
+          </div>
+        </div>
+
+        <!-- Terminal output panel -->
+        <div class="claude-terminal" id="claudeTerminal">
+          <div class="claude-terminal-header">
+            <div class="claude-terminal-title">
+              <div class="terminal-spinner" id="terminalSpinner"></div>
+              <span id="terminalTitle">Claude Output</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('claudeTerminal').classList.remove('visible')">✕</button>
+          </div>
+          <div class="claude-terminal-body" id="claudeTerminalBody"></div>
+        </div>
+      </div>
+
     </div>
   </div>`;
 }
@@ -1129,4 +1340,5 @@ document.addEventListener('keydown', e => {
 // once the user selects a platform and its script has loaded.
 window.addEventListener('DOMContentLoaded', () => {
   applyBrowserCompat();
+  startCompanionPolling();
 });

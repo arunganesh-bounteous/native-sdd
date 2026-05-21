@@ -120,6 +120,31 @@
   .md-rendered .md-code { font-family: var(--mono); font-size: 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 3px; padding: 1px 4px; color: var(--success); }
   .md-rendered .md-code-block { font-family: var(--mono); font-size: 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; margin: 6px 0; overflow-x: auto; white-space: pre; color: var(--text-dim); line-height: 1.5; }
 
+  /* ── Companion status indicator ── */
+  .companion-status { display:flex; align-items:center; gap:6px; }
+  .companion-dot { width:7px; height:7px; border-radius:50%; background:var(--text-muted); flex-shrink:0; transition:background 0.3s; }
+  .companion-dot.connected { background:#4ade80; box-shadow:0 0 6px rgba(74,222,128,0.5); }
+  .companion-dot.connecting { background:#fbbf24; animation:pulse-dot 1.2s ease-in-out infinite; }
+  @keyframes pulse-dot { 0%,100%{ opacity:1; } 50%{ opacity:0.3; } }
+  .companion-label { font-size:10px; color:var(--text-muted); white-space:nowrap; }
+  .companion-label.connected { color:#4ade80; }
+
+  /* ── Terminal panel (Claude run output) ── */
+  .claude-terminal { display:none; margin-top:20px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--border); background:#0d1117; }
+  .claude-terminal.visible { display:block; }
+  .claude-terminal-header { display:flex; align-items:center; justify-content:space-between; padding:8px 14px; background:#161b22; border-bottom:1px solid var(--border); }
+  .claude-terminal-title { font-size:11px; font-weight:600; color:var(--text-dim); letter-spacing:0.4px; text-transform:uppercase; display:flex; align-items:center; gap:8px; }
+  .terminal-spinner { width:10px; height:10px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; display:none; }
+  .terminal-spinner.active { display:inline-block; }
+  @keyframes spin { to{ transform:rotate(360deg); } }
+  .claude-terminal-body { font-family:var(--mono); font-size:11.5px; line-height:1.6; color:#c9d1d9; padding:14px 16px; max-height:380px; overflow-y:auto; white-space:pre-wrap; word-break:break-word; }
+  .claude-terminal-body .t-stderr { color:#f87171; }
+  .claude-terminal-body .t-done { color:#4ade80; font-weight:600; margin-top:8px; border-top:1px solid #30363d; padding-top:8px; }
+  .claude-terminal-body .t-err { color:#f87171; font-weight:600; }
+  .btn-run-claude { background:linear-gradient(135deg,#1d4ed8,#2563eb); color:#fff; border:none; font-size:12px; font-weight:600; padding:8px 18px; border-radius:var(--radius); cursor:pointer; display:inline-flex; align-items:center; gap:7px; transition:opacity 0.2s; }
+  .btn-run-claude:hover { opacity:0.85; }
+  .btn-run-claude:disabled { opacity:0.4; cursor:not-allowed; }
+
   /* ── Form elements ── */
   .form-section { margin-bottom: 28px; }
   .form-section h3 { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
@@ -536,10 +561,16 @@
         <a id="headerTutorial" href="#" target="_blank">📖 View tutorial ↗</a>
       </div>
       <div class="folder-status">
-        <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:10px;color:var(--text-muted);white-space:nowrap">Project</span>
-          <span id="sddBadge" class="folder-badge">Not selected</span>
-          <button class="btn btn-secondary btn-sm" onclick="grantFolder()">📂 Select</button>
+        <div style="display:flex;align-items:center;gap:14px">
+          <div class="companion-status" id="companionStatus" title="SDD Companion server">
+            <div class="companion-dot" id="companionDot"></div>
+            <span class="companion-label" id="companionLabel">Companion</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:10px;color:var(--text-muted);white-space:nowrap">Project</span>
+            <span id="sddBadge" class="folder-badge">Not selected</span>
+            <button class="btn btn-secondary btn-sm" onclick="grantFolder()">📂 Select</button>
+          </div>
         </div>
       </div>
     </div>
