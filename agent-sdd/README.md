@@ -124,6 +124,8 @@ files. See `agent-sdd/hooks/README.md` for details on what each hook does.
 
 ### Step 3 — Run the setup wizard (30–60 min)
 
+**Option A: Browser Wizard (Interactive)**
+
 Open `agent-sdd/setup-wizard.html` in **Chrome or Edge** (File System Access
 API is required for direct file saving — other browsers download files instead).
 
@@ -164,7 +166,7 @@ cp agent-sdd/tasks/BOOTSTRAP_TEMPLATE.md agent-artifacts/tasks/BOOTSTRAP-login.m
 
 Then in Claude Code:
 ```
-Read agent-sdd/CLAUDE.md and execute agent-artifacts/tasks/BOOTSTRAP-login.md
+Read agent-artifacts/CLAUDE.md and execute agent-artifacts/tasks/BOOTSTRAP-login.md
 ```
 
 Claude reads the source files, extracts structure, and writes
@@ -184,7 +186,7 @@ cp agent-sdd/tasks/TASK_TEMPLATE.md agent-artifacts/tasks/[PROJ]-1234.md
 
 In Claude Code:
 ```
-Read agent-sdd/CLAUDE.md and execute agent-artifacts/tasks/[PROJ]-1234.md
+Read agent-artifacts/CLAUDE.md and execute agent-artifacts/tasks/[PROJ]-1234.md
 ```
 
 The agent loads the right spec and context files, states its understanding,
@@ -257,7 +259,7 @@ green **● Companion** indicator in the header when it's connected.
 
 When you click **▶ Run with Claude**, the wizard:
 1. Auto-saves the task file to `agent-artifacts/tasks/<TICKET-ID>.md`
-2. Sends `claude --print --dangerously-skip-permissions "Read agent-sdd/CLAUDE.md and execute <path>"` to the companion
+2. Sends `claude --print --dangerously-skip-permissions "Read agent-artifacts/CLAUDE.md and execute <path>"` to the companion
 3. Streams the output into a terminal panel inline
 
 The companion server listens on `http://localhost:127.0.0.1:7842` and accepts CORS requests

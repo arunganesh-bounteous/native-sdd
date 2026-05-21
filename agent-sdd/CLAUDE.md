@@ -3,6 +3,17 @@
 # READ THIS FILE COMPLETELY BEFORE DOING ANYTHING ELSE.
 # This file governs every session. No exceptions.
 # ─────────────────────────────────────────────────────────────────────────────
+#
+# 📋 HOW THIS FILE IS USED:
+#
+# 1. Original location: agent-sdd/CLAUDE.md (this file, source of truth)
+# 2. Copied location: agent-artifacts/CLAUDE.md (read-only snapshot)
+#    → Setup wizard copies this file to agent-artifacts/ when setup completes
+#    → Projects use: claude "Read agent-artifacts/CLAUDE.md and execute ..."
+#    → This keeps projects self-contained (no path dependency on agent-sdd/)
+# 3. Protection: agent-artifacts/CLAUDE.md is read-only (hooks block edits)
+#    → To update, re-run setup wizard to get the latest version
+# ─────────────────────────────────────────────────────────────────────────────
 
 ## What This Is
 
@@ -14,8 +25,8 @@ This SDD skeleton gives you everything you need to work accurately and safely:
 - The task to execute (`agent-artifacts/tasks/<TICKET-ID>.md`)
 
 **Directory layout:**
-- `agent-sdd/` — the skeleton tool (wizard, templates, this file). Read-only — never modify anything here.
-- `agent-artifacts/` — your project's generated spec-kit, context files, and tasks. All agent reads and writes go here.
+- `agent-sdd/` — the skeleton tool (wizard, templates, **this CLAUDE.md file**). Read-only — never modify anything here.
+- `agent-artifacts/` — your project's generated spec-kit, context files, and tasks. All agent reads and writes go here. **Does NOT contain CLAUDE.md.**
 
 Your job: read the task MD, load the right context, write the code, update
 the context files, and produce a completion report. Nothing more.

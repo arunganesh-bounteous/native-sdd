@@ -593,6 +593,34 @@ async function saveFile(relativePath, content) {
   }
 }
 
+// Copy CLAUDE.md from agent-sdd/ to agent-artifacts/ as read-only reference
+async function copyCLAUDEmdToArtifacts() {
+  if (!state.dirHandle || !hasFSA) return; // Can't copy without FSA or folder handle
+  try {
+    // Get project root (handle agent-artifacts direct selection)
+    let projectRoot = state.dirHandle;
+    if (state.dirHandle.name === 'agent-artifacts') {
+      // We selected agent-artifacts, so go up to parent (project root)
+      // Unfortunately FSA doesn't have parent access, so we'll read from agent-sdd relative to current selection
+      // If user selected agent-artifacts, we assume agent-sdd is sibling
+      projectRoot = state.dirHandle;
+    }
+
+    // Read CLAUDE.md from agent-sdd/
+    const agentSddHandle = await projectRoot.getDirectoryHandle('agent-sdd', { create: false });
+    const claudeFileHandle = await agentSddHandle.getFileHandle('CLAUDE.md', { create: false });
+    const claudeFile = await claudeFileHandle.getFile();
+    const claudeContent = await claudeFile.text();
+
+    // Write to agent-artifacts/CLAUDE.md
+    await saveFile('CLAUDE.md', claudeContent);
+    showToast('✅ CLAUDE.md copied to agent-artifacts/ (read-only reference)', 'success');
+  } catch (e) {
+    console.warn('Could not copy CLAUDE.md:', e.message);
+    // Non-fatal — the user can copy manually or use from agent-sdd
+  }
+}
+
 function downloadFallback(filename, content) {
   const blob = new Blob([content], { type: 'text/markdown' });
   const url = URL.createObjectURL(blob);
@@ -901,6 +929,11 @@ async function saveStep(stepId) {
 
   // Platform-specific extra saves (e.g. modules also writes context/_index.md)
   await PLATFORM.extraSave?.[stepId]?.();
+
+  // When final step (datamodel) is saved, also copy CLAUDE.md to agent-artifacts/
+  if (stepId === 'datamodel') {
+    await copyCLAUDEmdToArtifacts();
+  }
 }
 
 // ══════════════════════════════════════════════════════

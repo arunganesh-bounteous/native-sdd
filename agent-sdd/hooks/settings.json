@@ -3,8 +3,10 @@
     "deny": [
       "Write(agent-sdd/**)",
       "Edit(agent-sdd/**)",
-      "Write(agent-sdd-output/spec-kit/**)",
-      "Edit(agent-sdd-output/spec-kit/**)",
+      "Write(agent-artifacts/CLAUDE.md)",
+      "Edit(agent-artifacts/CLAUDE.md)",
+      "Write(agent-artifacts/spec-kit/**)",
+      "Edit(agent-artifacts/spec-kit/**)",
       "Write(**/*.xcodeproj/**)",
       "Edit(**/*.xcodeproj/**)",
       "Write(**/*.xcworkspace/**)",
