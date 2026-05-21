@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SDD Wizard Engine Guide</title>
+  <style>
+    :root {
+      --bg: #0f0f0f;
+      --surface: #1a1a1a;
+      --surface2: #252525;
+      --border: #333;
+      --text: #e4e4e7;
+      --text-muted: #a1a1a9;
+      --accent: #0ea5e9;
+      --accent-dim: rgba(14, 165, 233, 0.15);
+      --success: #4ade80;
+      --warning: #fbbf24;
+      --error: #f87171;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    header {
+      background: var(--surface);
+      padding: 28px 40px;
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 {
+      margin: 0;
+      font-size: 26px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--accent);
+    }
+    header p {
+      margin: 8px 0 0;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 0;
+      min-height: calc(100vh - 120px);
+    }
+
+    nav {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 20px 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+    nav a {
+      display: block;
+      padding: 12px 20px;
+      color: var(--text-muted);
+      text-decoration: none;
+      border-left: 3px solid transparent;
+      transition: all 0.2s;
+      font-size: 13px;
+    }
+    nav a:hover {
+      color: var(--text);
+      background: var(--surface2);
+    }
+    nav a.active {
+      color: var(--accent);
+      border-left-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    main {
+      padding: 40px 40px;
+      overflow-y: auto;
+    }
+    main > section { display: none; }
+    main > section.active { display: block; }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0 0 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 24px 0 12px;
+      color: var(--accent);
+    }
+    h4 {
+      font-size: 13px;
+      font-weight: 600;
+      margin: 16px 0 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+
+    p { margin: 0 0 12px; }
+    ul, ol { margin: 12px 0; padding-left: 20px; }
+    li { margin: 6px 0; }
+
+    code {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 2px 6px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 12px;
+      color: var(--success);
+    }
+
+    pre {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      overflow-x: auto;
+      margin: 12px 0;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--text-muted);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 13px;
+    }
+    th {
+      background: var(--surface2);
+      padding: 10px;
+      text-align: left;
+      font-weight: 600;
+      border: 1px solid var(--border);
+    }
+    td {
+      padding: 10px;
+      border: 1px solid var(--border);
+    }
+    tr:nth-child(even) { background: var(--surface2); }
+
+    .info-box {
+      background: var(--accent-dim);
+      border-left: 4px solid var(--accent);
+      padding: 12px 16px;
+      margin: 12px 0;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .warning-box {
+      background: rgba(251,191,36,0.08);
+      border-left: 4px solid var(--warning);
+      padding: 12px 16px;
+      margin: 12px 0;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    .breadcrumb {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+    }
+
+    footer {
+      background: var(--surface);
+      padding: 16px 40px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 768px) {
+      .container { grid-template-columns: 1fr; }
+      nav { border-right: none; border-bottom: 1px solid var(--border); }
+      main { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🔧 SDD Wizard Engine Guide</h1>
+  <p>Complete reference for understanding and extending the setup wizard's platform detection engine</p>
+</header>
+
+<div class="container">
+  <nav id="sidebar">
+    <a href="#overview" class="nav-link active">📚 Overview</a>
+    <a href="#android" class="nav-link">🤖 Android Detection</a>
+    <a href="#android-signals" class="nav-link">└─ Dependency Signals</a>
+    <a href="#ios" class="nav-link">🍎 iOS Detection</a>
+    <a href="#ios-signals" class="nav-link">└─ Dependency Signals</a>
+    <a href="#extending" class="nav-link">➕ Extending</a>
+    <a href="#quickref" class="nav-link">⚡ Quick Reference</a>
+    <a href="#troubleshooting" class="nav-link">🐛 Troubleshooting</a>
+  </nav>
+
+  <main>
+
+<!-- ════════════════════════════════════════════════════════════════ OVERVIEW ════════════════════════════════════════════════════════════════ -->
+<section id="overview" class="active">
+  <h2>Overview</h2>
+  <p>The SDD wizard is a web-based tool that auto-detects your mobile project's stack and pre-fills a configuration spec-kit. It reads key files (Gradle, Xcode, source code) and extracts framework signals to recommend the right architecture, testing patterns, and migration rules.</p>
+
+  <h3>Architecture</h3>
+  <p>Three main components:</p>
+  <ul>
+    <li><strong>wizard-core.js</strong> (1500+ lines) — Platform-agnostic UI, state, file I/O, sidebar</li>
+    <li><strong>platform-android.js</strong> (3200+ lines) — Android-specific detection and form builders</li>
+    <li><strong>platform-ios.js</strong> (2900+ lines) — iOS-specific detection and form builders</li>
+  </ul>
+
+  <h3>Key Concepts</h3>
+  <ul>
+    <li><strong>File I/O:</strong> All reads/writes use <code>tryReadFile()</code> which returns file text or null</li>
+    <li><strong>State:</strong> Selected folder handle stored in <code>state.dirHandle</code> (the project root)</li>
+    <li><strong>Detection:</strong> <code>analyzeProject()</code> reads files, detects frameworks, pre-fills forms</li>
+    <li><strong>Persistence:</strong> All form values saved to localStorage (draft persistence)</li>
+    <li><strong>Output:</strong> Generated files saved to <code>state.dirHandle/agent-artifacts/</code> (project folder only)</li>
+  </ul>
+
+  <div class="info-box">
+    <strong>💡 Important:</strong> <code>agent-artifacts/</code> is created <strong>only inside the selected project folder</strong>, never inside the agent-sdd folder itself.
+  </div>
+
+  <h3>File Reading Pattern</h3>
+  <pre>const [gradle, settings] = await Promise.all([
+  tryReadFile(handle, 'build.gradle'),
+  tryReadFile(handle, 'settings.gradle'),
+]);
+// Returns file text if found, null if not (silent fallback)</pre>
+
+  <h3>Form Pre-filling Pattern</h3>
+  <pre>// Direct field assignment
+document.getElementById('cfg-min-sdk').value = '24';
+
+// Pill selection (radio/checkbox)
+selectPill('cfg-lang', 'Kotlin', 'radio');
+
+// Dropdown selection
+setSelectOption('test-runner', 'JUnit 5');</pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ ANDROID ════════════════════════════════════════════════════════════════ -->
+<section id="android">
+  <h2>Android Platform Detection</h2>
+
+  <h3>Files Read (in order)</h3>
+
+  <h4>1. Root Gradle Files (Parallel)</h4>
+  <ul>
+    <li><code>build.gradle</code> OR <code>build.gradle.kts</code></li>
+    <li><code>settings.gradle</code> OR <code>settings.gradle.kts</code></li>
+  </ul>
+  <p>Used for: Dependency detection, module discovery</p>
+
+  <h4>2. App Module Gradle</h4>
+  <p>Tries in order:</p>
+  <ol>
+    <li><code>app/build.gradle</code> (or .kts)</li>
+    <li>If not found, scans each module in settings.gradle until one has <code>com.android.application</code></li>
+  </ol>
+  <p>Extracts: <code>applicationId</code>, <code>minSdk</code>, <code>targetSdk</code>, <code>productFlavors</code></p>
+
+  <h4>3. Per-Module Gradle Files (Parallel)</h4>
+  <p>One file per Gradle module discovered in settings.gradle</p>
+  <p>Extracts: Module type (app vs library), DI framework presence</p>
+
+  <h3>Special: productFlavors Parsing</h3>
+  <p>Simple regex fails because it stops at the <strong>first <code>}</code></strong>. Solution: <strong>brace-counting</strong></p>
+
+  <pre>// Navigate through string, counting { and }
+let depth = 0;
+for (let i = openAt; i < text.length; i++) {
+  if (text[i] === '{') depth++;
+  else if (text[i] === '}') {
+    depth--;
+    if (depth === 0) { /* found closing brace */ }
+  }
+}</pre>
+
+  <p>For each flavor, extract:</p>
+  <ul>
+    <li>Flavor name: <code>development</code>, <code>staging</code>, <code>production</code></li>
+    <li><code>applicationIdSuffix</code> → append to base <code>applicationId</code></li>
+    <li><code>applicationId</code> → use as-is</li>
+  </ul>
+
+  <h3>Multi-Module Fallback</h3>
+  <p>If <code>app/build.gradle</code> doesn't exist:</p>
+  <pre>const moduleNames = [...settings.matchAll(/include\s*['"]:?([\w\-]+)['"]/g)]
+  .map(m => m[1]);
+
+for (const mod of moduleNames) {
+  const candidate = await tryReadFile(dirHandle, mod, 'build.gradle');
+  if (candidate && /com\.android\.application/.test(candidate)) {
+    appGradle = candidate; break;
+  }
+}</pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ ANDROID SIGNALS ════════════════════════════════════════════════════════════════ -->
+<section id="android-signals">
+  <h2>Android — Dependency Detection Signals</h2>
+  <p>All signals are <strong>case-insensitive substring searches</strong> in the combined Gradle text.</p>
+
+  <table>
+    <tr>
+      <th>Signal</th>
+      <th>Searches for</th>
+      <th>Result</th>
+    </tr>
+    <tr>
+      <td><strong>Language</strong></td>
+      <td>Source file count (*.kt vs *.java)</td>
+      <td>Kotlin / Java / Kotlin+Java</td>
+    </tr>
+    <tr>
+      <td><strong>DI</strong></td>
+      <td><code>hilt-android</code>, <code>dagger.hilt</code></td>
+      <td>Hilt</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>com.google.dagger</code> (without hilt)</td>
+      <td>Dagger</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>insert-koin</code>, <code>koin-android</code></td>
+      <td>Koin</td>
+    </tr>
+    <tr>
+      <td><strong>UI Framework</strong></td>
+      <td><code>androidx.compose</code>, <code>compose-bom</code></td>
+      <td>Compose (or Mixed if also has XML libs)</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>appcompat</code> AND <code>constraintlayout</code></td>
+      <td>XML</td>
+    </tr>
+    <tr>
+      <td><strong>Navigation</strong></td>
+      <td><code>navigation-compose</code></td>
+      <td>ComposeNav</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>navigation-fragment</code> AND <code>navigation-ui</code></td>
+      <td>JetpackNav</td>
+    </tr>
+    <tr>
+      <td><strong>Async</strong></td>
+      <td><code>kotlinx-coroutines</code></td>
+      <td>Coroutines + StateFlow</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>rxjava:2</code>, <code>rxandroid:2</code></td>
+      <td>RxJava2</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>rxjava3</code>, <code>rxandroid:3</code></td>
+      <td>RxJava3</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>lifecycle-livedata</code>, <code>livedata-ktx</code></td>
+      <td>LiveData</td>
+    </tr>
+    <tr>
+      <td><strong>Network</strong></td>
+      <td><code>retrofit</code></td>
+      <td>Retrofit</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>okhttp</code></td>
+      <td>OkHttp</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>io.ktor</code></td>
+      <td>Ktor</td>
+    </tr>
+    <tr>
+      <td><strong>Storage</strong></td>
+      <td><code>room-runtime</code>, <code>room-ktx</code>, <code>androidx.room</code></td>
+      <td>Room</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>datastore</code></td>
+      <td>DataStore</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>realm</code></td>
+      <td>Realm</td>
+    </tr>
+    <tr>
+      <td><strong>Image Loading</strong></td>
+      <td><code>io.coil-kt</code>, <code>coil-kt</code></td>
+      <td>Coil</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>squareup.picasso</code></td>
+      <td>Picasso</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>bumptech.glide</code></td>
+      <td>Glide</td>
+    </tr>
+    <tr>
+      <td><strong>Testing</strong></td>
+      <td><code>junit.jupiter</code>, <code>junit5</code></td>
+      <td>JUnit 5</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>mockk</code></td>
+      <td>MockK</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>turbine</code></td>
+      <td>Turbine (Flow testing)</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>truth</code></td>
+      <td>Truth (assertions)</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>espresso</code></td>
+      <td>Espresso</td>
+    </tr>
+  </table>
+
+  <h3>To Add New Framework Detection</h3>
+  <ol>
+    <li>Find the dependency name in your build.gradle</li>
+    <li>Open <code>platform-android.js</code>, find <code>analyzeProject()</code> around line 310</li>
+    <li>Add to the appropriate section (DI, UI, Network, etc.):
+      <pre>if (has('dependency-name')) selectPill('pill-id', 'Label', 'radio');</pre>
+    </li>
+    <li>Update the dependency signals table in this guide</li>
+  </ol>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ iOS ════════════════════════════════════════════════════════════════ -->
+<section id="ios">
+  <h2>iOS Platform Detection</h2>
+
+  <h3>Files Read (in order)</h3>
+
+  <h4>1. Locate .xcodeproj Directory</h4>
+  <p>Scans project root for <code>*.xcodeproj</code> folder (recursive). Uses found directory for next reads.</p>
+
+  <h4>2. Dependency Manifests (Parallel)</h4>
+  <ul>
+    <li><code>Package.swift</code> — SPM dependencies</li>
+    <li><code>Podfile</code> — CocoaPods dependencies</li>
+    <li><code>&lt;App&gt;.xcodeproj/project.pbxproj</code> — Xcode build configuration</li>
+  </ul>
+
+  <h4>3. Swift Source Files (Recursive scan, depth 5)</h4>
+  <p>Reads up to 40 .swift files to detect framework imports and patterns. Skips: <code>.build/</code>, <code>.git/</code>, <code>Pods/</code>, <code>DerivedData/</code>, <code>build/</code>, <code>.swiftpm/</code></p>
+
+  <h4>4. Parse project.pbxproj for Bundle IDs</h4>
+  <p>Extracts <code>PRODUCT_BUNDLE_IDENTIFIER</code> from each <code>isa = XCBuildConfiguration;</code> block. Stores in map: <code>configName → bundleId</code></p>
+
+  <h4>5. Scan .xcconfig Files (Recursive, depth 6)</h4>
+  <p>Finds <code>BUNDLE_ID</code> or <code>PRODUCT_BUNDLE_IDENTIFIER</code> values in .xcconfig files. Merges with pbxproj map.</p>
+
+  <h4>6. Resolve Main Bundle ID</h4>
+  <p>Priority order:</p>
+  <ol>
+    <li><code>AppStore</code></li>
+    <li><code>AppStore-Release</code></li>
+    <li><code>Release</code></li>
+    <li>First non-dev ID</li>
+    <li>First ID if all are dev</li>
+  </ol>
+
+  <h3>Why Multiple Files?</h3>
+  <ul>
+    <li><strong>pbxproj:</strong> Official Xcode config, but may use variable references</li>
+    <li><strong>xcconfig:</strong> Fallback for variable definitions</li>
+    <li><strong>Swift source:</strong> Framework imports are most reliable signal for actual dependencies</li>
+  </ul>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ iOS SIGNALS ════════════════════════════════════════════════════════════════ -->
+<section id="ios-signals">
+  <h2>iOS — Dependency Detection Signals</h2>
+  <p>Three sources: SPM/Pods imports (<code>hasImp</code>), manifest text (<code>hasSrc</code>), source code patterns (<code>hasPat</code>)</p>
+
+  <table>
+    <tr>
+      <th>Signal</th>
+      <th>Searches for</th>
+      <th>Result</th>
+    </tr>
+    <tr>
+      <td><strong>Language</strong></td>
+      <td>Source file count (*.swift vs *.m/*.mm)</td>
+      <td>Swift / Objective-C / Swift+ObjC</td>
+    </tr>
+    <tr>
+      <td><strong>State Management</strong></td>
+      <td><code>import Combine</code> OR <code>@Published</code></td>
+      <td>Combine</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>@Observable</code></td>
+      <td>Observation (iOS 17+)</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>@StateObject</code> OR <code>@ObservedObject</code></td>
+      <td>@StateObject</td>
+    </tr>
+    <tr>
+      <td><strong>UI Framework</strong></td>
+      <td><code>: View</code> OR <code>some View</code></td>
+      <td>SwiftUI</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>UIViewController</code> OR <code>: UIView</code></td>
+      <td>UIKit</td>
+    </tr>
+    <tr>
+      <td><strong>Navigation</strong></td>
+      <td><code>NavigationStack</code></td>
+      <td>NavigationStack (iOS 16+)</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>Coordinator</code> pattern</td>
+      <td>Coordinator</td>
+    </tr>
+    <tr>
+      <td><strong>Architecture</strong></td>
+      <td><code>import ComposableArchitecture</code></td>
+      <td>TCA (The Composable Architecture)</td>
+    </tr>
+    <tr>
+      <td><strong>Async</strong></td>
+      <td><code>async </code> OR <code>await </code></td>
+      <td>Async/Await (Swift 5.5+)</td>
+    </tr>
+    <tr>
+      <td><strong>Networking</strong></td>
+      <td><code>import Alamofire</code></td>
+      <td>Alamofire</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>import Moya</code></td>
+      <td>Moya</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>URLSession</code> pattern</td>
+      <td>URLSession (native)</td>
+    </tr>
+    <tr>
+      <td><strong>Image Loading</strong></td>
+      <td><code>import Kingfisher</code></td>
+      <td>Kingfisher</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>import SDWebImage</code></td>
+      <td>SDWebImage</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td><code>import Nuke</code></td>
+      <td>Nuke</td>
+    </tr>
+  </table>
+
+  <h3>To Add New Framework Detection</h3>
+  <ol>
+    <li>Determine the signal source:
+      <ul>
+        <li><strong>SPM:</strong> <code>hasImp('FrameworkName')</code> — looks for import statement</li>
+        <li><strong>Pods:</strong> <code>hasSrc('framework-name')</code> — substring in Podfile</li>
+        <li><strong>Source pattern:</strong> <code>hasPat('pattern-key')</code> — regex in Swift files</li>
+      </ul>
+    </li>
+    <li>Open <code>platform-ios.js</code>, find <code>analyzeProject()</code> around line 290</li>
+    <li>Add detection and form pre-fill:
+      <pre>if (hasImp('Kingfisher')) selectPill('img-lib', 'Kingfisher', 'radio');</pre>
+    </li>
+    <li>Update the dependency signals table in this guide</li>
+  </ol>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ EXTENDING ════════════════════════════════════════════════════════════════ -->
+<section id="extending">
+  <h2>Extending the Wizard</h2>
+
+  <h3>Adding a New Platform (e.g., Flutter, React Native)</h3>
+  <ol>
+    <li>Create <code>engine/platform-newos.js</code></li>
+    <li>Export <code>PLATFORM</code> object:
+      <pre>const PLATFORM = {
+  id: 'newos',
+  name: 'NewOS',
+  steps: [{ id: 'welcome', ... }, ...],
+  buildScreens: { projectconfig: ..., ... },
+  onFolderGranted: () => analyzeProject(),
+  taskDefaults: { qualityGate: [...] },
+};</pre>
+    </li>
+    <li>Implement <code>analyzeProject()</code> following Android/iOS pattern:
+      <ul>
+        <li>Read key files (build config, manifests, source files)</li>
+        <li>Extract project data via regex/parsing</li>
+        <li>Pre-fill form via <code>selectPill()</code>, <code>document.getElementById().value = ...</code></li>
+        <li>Call <code>updatePreview()</code> when done</li>
+      </ul>
+    </li>
+    <li>Update <code>setup-wizard.html</code> to add platform choice in overlay</li>
+  </ol>
+
+  <h3>Adding a Form Field</h3>
+  <ol>
+    <li>Add HTML input to <code>buildProjectConfigScreen()</code>:
+      <pre>&lt;input type="text" id="cfg-fieldname"
+  placeholder="e.g. com.example.app"
+  oninput="updatePreview('projectconfig'); saveDraft()"&gt;</pre>
+    </li>
+    <li>Auto-populate in <code>analyzeProject()</code>:
+      <pre>const value = appGradle.match(/your-regex/)?.[1];
+const el = document.getElementById('cfg-fieldname');
+if (el && !el.value) el.value = value;</pre>
+    </li>
+    <li>Include in MD generation in <code>generateProjectConfigMD()</code>:
+      <pre>const fieldname = document.getElementById('cfg-fieldname')?.value.trim();
+if (fieldname) md += `fieldname: ${fieldname}\n`;</pre>
+    </li>
+  </ol>
+
+  <h3>Adding Framework Detection</h3>
+  <p><strong>Android:</strong> See "Android — Dependency Detection Signals" section above</p>
+  <p><strong>iOS:</strong> See "iOS — Dependency Detection Signals" section above</p>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ QUICK REF ════════════════════════════════════════════════════════════════ -->
+<section id="quickref">
+  <h2>Quick Reference</h2>
+
+  <h3>Key Functions</h3>
+  <table>
+    <tr>
+      <th>Task</th>
+      <th>Function</th>
+      <th>File</th>
+    </tr>
+    <tr>
+      <td>Read file from selected folder</td>
+      <td><code>tryReadFile(handle, ...parts)</code></td>
+      <td>wizard-core.js</td>
+    </tr>
+    <tr>
+      <td>Pre-fill text field</td>
+      <td><code>document.getElementById(id).value = ...</code></td>
+      <td>platform-*.js</td>
+    </tr>
+    <tr>
+      <td>Select pill (radio/checkbox)</td>
+      <td><code>selectPill(id, value, 'radio')</code></td>
+      <td>wizard-core.js</td>
+    </tr>
+    <tr>
+      <td>Update preview panel</td>
+      <td><code>updatePreview(stepId)</code></td>
+      <td>wizard-core.js</td>
+    </tr>
+    <tr>
+      <td>Save draft to localStorage</td>
+      <td><code>saveDraft()</code></td>
+      <td>wizard-core.js</td>
+    </tr>
+  </table>
+
+  <h3>Common Regex Patterns</h3>
+
+  <h4>Gradle (Android)</h4>
+  <pre>// applicationId
+const match = gradle.match(/\bapplicationId\b\s*=?\s*["']([^"']+)["']/);
+
+// minSdk / targetSdk
+const minMatch = gradle.match(/\bminSdk(?:Version)?\b\s*=?\s*(\d+)/);
+
+// Module names in settings.gradle
+const modules = [...gradle.matchAll(/include\s*['"]:?([\w\-]+)['"]/g)]
+  .map(m => m[1]);</pre>
+
+  <h4>Xcode (iOS)</h4>
+  <pre>// Bundle ID from pbxproj
+const match = text.match(/PRODUCT_BUNDLE_IDENTIFIER\s*=\s*([^\s$(\n;]+)\s*;/);
+
+// Build configuration name
+const nameMatch = text.match(/\bname\s*=\s*"?([^";\n]+)"?\s*;/);
+
+// Import statement from .swift
+const imports = [...text.matchAll(/^import\s+(\w+)/gm)]
+  .map(m => m[1]);</pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ TROUBLESHOOTING ════════════════════════════════════════════════════════════════ -->
+<section id="troubleshooting">
+  <h2>Troubleshooting</h2>
+
+  <table>
+    <tr>
+      <th>Problem</th>
+      <th>Likely Cause</th>
+      <th>Fix</th>
+    </tr>
+    <tr>
+      <td>Form fields not pre-filled</td>
+      <td><code>analyzeProject()</code> not called or early return</td>
+      <td>Check that platform's <code>onFolderGranted()</code> is wired</td>
+    </tr>
+    <tr>
+      <td>Blank preview panel</td>
+      <td><code>updatePreview()</code> not called</td>
+      <td>Add <code>updatePreview(stepId)</code> after form updates</td>
+    </tr>
+    <tr>
+      <td>Module detection wrong</td>
+      <td>Gradle files not read OR regex mismatch</td>
+      <td>Add console.log after file reads; test regex on actual build.gradle</td>
+    </tr>
+    <tr>
+      <td>Old values persist</td>
+      <td>Draft localStorage not cleared</td>
+      <td>Reopen in new browser tab or clear localStorage</td>
+    </tr>
+    <tr>
+      <td>iOS bundle ID missing</td>
+      <td>pbxproj/xcconfig not found OR parsing failed</td>
+      <td>Verify app has build configurations; check xcconfig exists</td>
+    </tr>
+  </table>
+
+  <h3>Debugging Steps</h3>
+  <ol>
+    <li>Open DevTools (F12), check Console tab for errors</li>
+    <li>Add logging after each <code>tryReadFile()</code>:
+      <pre>const file = await tryReadFile(...);
+console.log('Read file:', file ? file.slice(0, 100) : 'NOT FOUND');</pre>
+    </li>
+    <li>Check form state: DevTools → Elements, verify <code>value</code> and <code>checked</code> attributes</li>
+    <li>Check preview: Does Markdown on right match detected values?</li>
+    <li>Test edge cases: Multi-module projects, mixed Kotlin+Java, multiple build configs</li>
+  </ol>
+
+  <h3>Code Review Checklist</h3>
+  <ul>
+    <li>[ ] Regex tested on both Groovy and Kotlin DSL (Android)</li>
+    <li>[ ] Fallbacks in place (try multiple syntax variants)</li>
+    <li>[ ] <code>updatePreview()</code> called after form updates</li>
+    <li>[ ] <code>saveDraft()</code> called for user-editable fields</li>
+    <li>[ ] Dependency signals are case-insensitive</li>
+    <li>[ ] Console has no error/warning messages</li>
+    <li>[ ] Multi-module projects tested</li>
+    <li>[ ] Documentation updated</li>
+  </ul>
+</section>
+
+  </main>
+</div>
+
+<footer>
+  <p>SDD Wizard Engine Documentation — Generated May 2026</p>
+  <p><a href="README.md" style="color: var(--accent); text-decoration: none;">← Back to docs/</a></p>
+</footer>
+
+<script>
+  document.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const sectionId = link.getAttribute('href').slice(1);
+      document.querySelectorAll('main > section').forEach(s => s.classList.remove('active'));
+      document.getElementById(sectionId).classList.add('active');
+      document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+      link.classList.add('active');
+      window.scrollTo(0, 0);
+    });
+  });
+</script>
+
+</body>
+</html>

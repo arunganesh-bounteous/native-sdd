@@ -583,7 +583,7 @@ async function analyzeProject() {
   if (hasUIKit && hasSwiftUI)  setToggle('uikit', true);
 
   // ── Step 13: Modules list — prefer existing MODULE_MAP.md ──
-  const existingModuleMap = await tryReadFile(state.dirHandle, 'agent-sdd-output', 'spec-kit', 'MODULE_MAP.md');
+  const existingModuleMap = await tryReadFile(state.dirHandle, 'agent-artifacts', 'spec-kit', 'MODULE_MAP.md');
   const parsedModules = existingModuleMap ? parseModuleMapMD(existingModuleMap) : [];
 
   if (parsedModules.length > 0) {
@@ -609,7 +609,7 @@ async function analyzeProject() {
   }
 
   // ── Load existing DATA_MODEL.md ──────────────────────
-  const existingDataModel = await tryReadFile(state.dirHandle, 'agent-sdd-output', 'spec-kit', 'DATA_MODEL.md');
+  const existingDataModel = await tryReadFile(state.dirHandle, 'agent-artifacts', 'spec-kit', 'DATA_MODEL.md');
   if (existingDataModel) {
     const { entities } = parseDataModelMD(existingDataModel);
     const entList = document.getElementById('entities-list');

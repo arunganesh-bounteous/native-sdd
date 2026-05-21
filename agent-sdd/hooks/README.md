@@ -38,7 +38,7 @@ Declared in `settings.json` — Claude Code enforces these before any tool runs.
 
 Blocks writes to:
 - `agent-sdd/**` — the SDD tool itself (treat as a read-only submodule)
-- `agent-sdd-output/spec-kit/**` — wizard-generated AI artifacts and human specs
+- `agent-artifacts/spec-kit/**` — wizard-generated AI artifacts and human specs
 - `*.xcodeproj/**`, `*.xcworkspace/**` — Xcode project files
 - `BuildConfig.java`, `R.java`, `*.generated.kt` — Android auto-generated files
 - `gradlew`, `gradlew.bat` — Gradle wrapper scripts

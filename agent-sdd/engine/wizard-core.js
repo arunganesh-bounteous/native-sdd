@@ -38,6 +38,191 @@ const state = {
   detectedModuleDetails: [], // [{name, type, diCol, notes}] from settings.gradle + each module's build.gradle
 };
 
+// ══════════════════════════════════════════════════════
+//  COMPANION  (Option B — local claude CLI bridge)
+//  node agent-sdd/companion.js  →  http://localhost:7842
+// ══════════════════════════════════════════════════════
+const COMPANION_URL    = 'http://localhost:7842';
+let   companionReady   = false;
+let   companionPollTimer = null;
+
+async function pollCompanion() {
+  try {
+    const r = await fetch(COMPANION_URL + '/health', { signal: AbortSignal.timeout(1500) });
+    if (r.ok) {
+      const data = await r.json();
+      // Check whether the companion's project matches the wizard's selected folder.
+      // The browser can't give us the full path, but we can compare folder names.
+      const selectedName   = state.dirHandle?.name || null;
+      const companionName  = data.projectName || null;
+      const mismatch       = selectedName && companionName && selectedName !== companionName;
+      setCompanionStatus(true, data.projectRoot, mismatch ? { selected: selectedName, companion: companionName } : null);
+      return;
+    }
+  } catch (_) { /* not running */ }
+  setCompanionStatus(false);
+}
+
+function setCompanionStatus(connected, projectRoot, mismatch) {
+  // mismatch = null (ok) | { selected, companion } (folder names differ)
+  companionReady = connected && !mismatch;
+  const dot   = document.getElementById('companionDot');
+  const label = document.getElementById('companionLabel');
+  if (!dot || !label) return;
+
+  if (connected && mismatch) {
+    dot.className     = 'companion-dot connecting';   // amber = warning
+    label.textContent = '⚠ Companion';
+    label.className   = 'companion-label';
+    label.style.color = '#fbbf24';
+    label.title       = `Companion project: "${mismatch.companion}"\nWizard project: "${mismatch.selected}"\n\nThey don't match. Run the companion from inside your selected project:\n  node agent-sdd/companion.js\nor pass the path explicitly:\n  node /path/to/agent-sdd/companion.js --project /path/to/${mismatch.selected}`;
+  } else if (connected) {
+    dot.className     = 'companion-dot connected';
+    label.textContent = '● Companion';
+    label.className   = 'companion-label connected';
+    label.style.color = '';
+    label.title       = 'SDD Companion running — project: ' + (projectRoot || '?');
+  } else {
+    dot.className     = 'companion-dot';
+    label.textContent = 'Companion';
+    label.className   = 'companion-label';
+    label.style.color = '';
+    label.title       = 'Companion not running.\nStart it from your project root:\n  node agent-sdd/companion.js';
+  }
+
+  // Refresh run-button state and hint if task screen is visible
+  const btn  = document.getElementById('btnRunClaude');
+  const hint = document.getElementById('companionHint');
+  if (btn) {
+    btn.disabled = !companionReady;
+    if (!connected) {
+      btn.title = 'Start the companion first:\n  node agent-sdd/companion.js';
+    } else if (mismatch) {
+      btn.title = `Companion is pointed at "${mismatch.companion}" but wizard has "${mismatch.selected}" selected — fix the mismatch first`;
+    } else {
+      btn.title = 'Run this task with Claude Code CLI';
+    }
+  }
+  if (hint) {
+    if (!connected) {
+      hint.innerHTML = 'Start the companion from your project root: <code style="font-size:10px;background:var(--surface2);padding:2px 6px;border-radius:3px;border:1px solid var(--border)">node agent-sdd/companion.js</code>';
+      hint.style.display = '';
+    } else if (mismatch) {
+      hint.innerHTML = `⚠ Companion is serving <strong>${mismatch.companion}</strong> but you selected <strong>${mismatch.selected}</strong>. Run companion from inside the selected project.`;
+      hint.style.color  = '#fbbf24';
+      hint.style.display = '';
+    } else {
+      hint.style.display = 'none';
+    }
+  }
+}
+
+function startCompanionPolling() {
+  pollCompanion();
+  companionPollTimer = setInterval(pollCompanion, 5000);
+}
+
+async function runWithClaude() {
+  const id = document.getElementById('task-id')?.value.trim();
+  if (!id) { showToast('Enter a Ticket ID first', 'error'); return; }
+
+  if (!companionReady) {
+    showToast('Companion not ready — check the ⚠ indicator in the header', 'error');
+    return;
+  }
+
+  // Auto-save task before running
+  await saveTask();
+
+  const taskPath = 'agent-artifacts/tasks/' + id + '.md';
+
+  const terminal  = document.getElementById('claudeTerminal');
+  const body      = document.getElementById('claudeTerminalBody');
+  const spinner   = document.getElementById('terminalSpinner');
+  const titleEl   = document.getElementById('terminalTitle');
+  const runBtn    = document.getElementById('btnRunClaude');
+
+  if (!terminal || !body) return;
+
+  // Reset
+  body.innerHTML = '';
+  terminal.classList.add('visible');
+  if (spinner) spinner.classList.add('active');
+  if (titleEl) titleEl.textContent = 'Running ' + id + '…';
+  if (runBtn)  { runBtn.disabled = true; runBtn.textContent = '⏳ Running…'; }
+  terminal.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  try {
+    const res = await fetch(COMPANION_URL + '/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskPath }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+      appendTerminal(body, err.error || 'Request failed', 'err');
+      if (spinner) spinner.classList.remove('active');
+      if (titleEl) titleEl.textContent = 'Error';
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const dec    = new TextDecoder();
+    let   buf    = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+
+      // Parse SSE lines from buffer
+      const lines = buf.split('\n');
+      buf = lines.pop(); // keep incomplete last line
+      let event = null;
+      for (const line of lines) {
+        if (line.startsWith('event: '))       { event = line.slice(7).trim(); }
+        else if (line.startsWith('data: ')) {
+          try {
+            const payload = JSON.parse(line.slice(6));
+            if (event === 'chunk') {
+              appendTerminal(body, payload.text, payload.stderr ? 'stderr' : '');
+            } else if (event === 'done') {
+              const code = payload.exitCode ?? 0;
+              if (spinner) spinner.classList.remove('active');
+              if (titleEl) titleEl.textContent = code === 0 ? id + ' — Done ✅' : id + ' — Exited ' + code;
+              appendTerminal(body, code === 0 ? '✅ Completed (exit 0)' : '⚠ Exited with code ' + code, 'done');
+            } else if (event === 'error') {
+              appendTerminal(body, payload.message || 'Unknown error', 'err');
+              if (spinner) spinner.classList.remove('active');
+              if (titleEl) titleEl.textContent = 'Error';
+            }
+          } catch (_) { /* malformed JSON — skip */ }
+          event = null;
+        }
+      }
+
+      // Auto-scroll terminal
+      body.scrollTop = body.scrollHeight;
+    }
+  } catch (err) {
+    appendTerminal(body, 'Connection failed: ' + err.message, 'err');
+    if (spinner) spinner.classList.remove('active');
+    if (titleEl) titleEl.textContent = 'Connection error';
+  } finally {
+    if (runBtn) { runBtn.disabled = !companionReady; runBtn.textContent = '▶ Run with Claude'; }
+  }
+}
+
+function appendTerminal(body, text, type) {
+  if (!body || !text) return;
+  const span = document.createElement('span');
+  span.className = type === 'stderr' ? 't-stderr' : type === 'done' ? 't-done' : type === 'err' ? 't-err' : '';
+  span.textContent = text;
+  body.appendChild(span);
+  body.scrollTop = body.scrollHeight;
+}
+
 const STEPS = [
   { id: 'welcome', icon: '👋', label: 'Welcome', file: null },
   { id: 'done',    icon: '✅', label: 'Done',    file: null },
@@ -261,19 +446,84 @@ async function grantFolder() {
     badge.className = 'folder-badge granted';
     showToast('Project folder set: ' + handle.name + ' — analysing…', 'success');
 
-    // Auto-set codebase_path to '..' — always correct when agent-sdd-output/ is inside project root
+    // Auto-set codebase_path to '..' — always correct when agent-artifacts/ is inside project root
     const pathEl = document.getElementById('cfg-codebase-path');
     if (pathEl && !pathEl.value) pathEl.value = '..';
 
-    // Try to load existing agent-sdd-output/project.config.md and pre-fill the form
-    const existing = await tryReadFile(handle, 'agent-sdd-output', 'project.config.md');
+    // Try to load existing agent-artifacts/project.config.md and pre-fill the form
+    const existing = await tryReadFile(handle, 'agent-artifacts', 'project.config.md');
     if (existing) loadExistingConfig(existing);
 
     // Platform hook — e.g. analyzeProject()
     PLATFORM.onFolderGranted?.();
+
+    // Light up sidebar ✅ for any steps whose output files already exist
+    detectExistingOutputFiles(handle);
   } catch (e) {
     if (e.name !== 'AbortError') showToast('Could not access folder — try selecting the folder again.', 'error');
   }
+}
+
+// ── Detect already-saved output files and light up sidebar ✅ ─────────────────
+// Called after a project folder is selected. For each step that has an output
+// file, checks whether agent-artifacts/<file> already exists. If it does, marks
+// state.saved so the sidebar shows ✅ without the user re-running that step.
+async function detectExistingOutputFiles(handle) {
+  if (!handle) return;
+
+  let completedCount = 0;
+  const contentSteps = STEPS.filter(s => s.file);
+
+  await Promise.all(contentSteps.map(async step => {
+    const parts = step.file.split('/');    // e.g. 'spec-kit/ARCHITECTURE.md' → ['spec-kit','ARCHITECTURE.md']
+    const content = await tryReadFile(handle, 'agent-artifacts', ...parts);
+    if (content) {
+      state.saved[step.id] = true;
+      completedCount++;
+    }
+  }));
+
+  buildSidebar();
+
+  if (completedCount === 0) return;
+
+  // Update or inject the setup-status banner on the welcome screen
+  const allDone = completedCount === contentSteps.length;
+  showSetupBanner(completedCount, contentSteps.length, allDone);
+}
+
+function showSetupBanner(done, total, allDone) {
+  // Remove any existing banner first
+  document.getElementById('setupStatusBanner')?.remove();
+
+  const welcome = document.getElementById('screen-welcome');
+  if (!welcome) return;
+
+  const banner = document.createElement('div');
+  banner.id = 'setupStatusBanner';
+
+  if (allDone) {
+    banner.style.cssText = 'background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.3);border-radius:var(--radius);padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px';
+    banner.innerHTML = `
+      <span style="font-size:22px">✅</span>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#4ade80">Setup already complete for this project</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px">All ${total} spec-kit files found in <code>agent-artifacts/</code>. You can jump to any step to review or update a file — no need to redo the whole setup.</div>
+      </div>`;
+  } else {
+    banner.style.cssText = 'background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.3);border-radius:var(--radius);padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px';
+    banner.innerHTML = `
+      <span style="font-size:22px">⚠️</span>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#fbbf24">Partial setup detected (${done}/${total} steps)</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Some spec-kit files are missing. Steps marked ✅ in the sidebar are already saved — continue from where you left off.</div>
+      </div>`;
+  }
+
+  // Insert at the top of the welcome screen content
+  const hero = welcome.querySelector('.welcome-hero');
+  if (hero) hero.insertBefore(banner, hero.firstChild);
+  else welcome.insertBefore(banner, welcome.firstChild);
 }
 
 function loadExistingConfig(text) {
@@ -322,10 +572,10 @@ async function countSourceFiles(dirHandle, maxDepth = 4) {
 async function saveFile(relativePath, content) {
   if (!state.dirHandle) { showToast('Select a project folder first', 'error'); return false; }
   try {
-    // Support both: project root selected (agent-sdd-output/ created inside) or agent-sdd-output/ selected directly.
-    const sddDir = state.dirHandle.name === 'agent-sdd-output'
+    // Support both: project root selected (agent-artifacts/ created inside) or agent-artifacts/ selected directly.
+    const sddDir = state.dirHandle.name === 'agent-artifacts'
       ? state.dirHandle
-      : await state.dirHandle.getDirectoryHandle('agent-sdd-output', { create: true });
+      : await state.dirHandle.getDirectoryHandle('agent-artifacts', { create: true });
 
     const parts = relativePath.split('/');
     let dir = sddDir;
@@ -354,7 +604,7 @@ function downloadFallback(filename, content) {
 async function handleSave(stepId, filename, content) {
   // No folder selected yet — prompt the user to pick one before saving
   if (hasFSA && !state.dirHandle) {
-    showToast('Select your project root or agent-sdd-output/ folder to save directly…', 'info');
+    showToast('Select your project root or agent-artifacts/ folder to save directly…', 'info');
     try {
       const handle = await window.showDirectoryPicker();
       state.dirHandle = handle;
@@ -633,7 +883,7 @@ async function saveStep(stepId) {
   const protectedSteps = { modules: 'MODULE_MAP.md', datamodel: 'DATA_MODEL.md' };
   if (protectedSteps[stepId] && state.dirHandle) {
     const filename = protectedSteps[stepId];
-    const exists   = await tryReadFile(state.dirHandle, 'agent-sdd-output', 'spec-kit', filename)
+    const exists   = await tryReadFile(state.dirHandle, 'agent-artifacts', 'spec-kit', filename)
                   ?? await tryReadFile(state.dirHandle, 'spec-kit', filename);
     if (exists) {
       const go = confirm(
@@ -675,11 +925,11 @@ function init() {
         <div style="display:flex;flex-direction:column;gap:10px">
           ${[
             ['1','Open in Chrome or Edge','Double-click <code>setup-wizard.html</code>. File System Access API requires Chrome or Edge — other browsers will download files instead of saving directly.'],
-            ['2','Select your project folder','Point to your project root (e.g. <code>MyApp/</code>). The wizard auto-detects your stack and writes all generated files into <code>agent-sdd-output/</code> inside it.'],
+            ['2','Select your project folder','Point to your project root (e.g. <code>MyApp/</code>). The wizard auto-detects your stack and writes all generated files into <code>agent-artifacts/</code> inside it.'],
             ['3','Fill in each step','Work through the sidebar steps left to right. Select your stack options, add modules and debt entries. The MD preview on the right updates live.'],
-            ['4','Save each file','Click the green <strong>💾 Save</strong> button on each step. Files are written directly to <code>agent-sdd-output/spec-kit/</code> inside the folder you selected. The sidebar shows ✅ for saved steps.'],
+            ['4','Save each file','Click the green <strong>💾 Save</strong> button on each step. Files are written directly to <code>agent-artifacts/spec-kit/</code> inside the folder you selected. The sidebar shows ✅ for saved steps.'],
             ['5','Review the generated files','Open the saved <code>.md</code> files in your editor. Replace any <code>[fill in]</code> placeholders with your project-specific details.'],
-            ['6','Run your first agent task','Copy <code>agent-sdd/tasks/TASK_TEMPLATE.md</code> to <code>agent-sdd-output/tasks/</code>, fill in a real ticket, open a Claude session, and let the agent execute it.'],
+            ['6','Run your first agent task','Copy <code>agent-sdd/tasks/TASK_TEMPLATE.md</code> to <code>agent-artifacts/tasks/</code>, fill in a real ticket, open a Claude session, and let the agent execute it.'],
           ].map(([n, title, desc]) => `
           <div style="display:flex;gap:12px;align-items:flex-start">
             <div style="background:var(--accent-dim);color:var(--accent);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px">${n}</div>
@@ -1022,6 +1272,32 @@ function buildTaskScreen(fp) {
         <button class="btn btn-secondary" onclick="resetTaskForm()">↺ New Task</button>
       </div>
 
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <div>
+            <button class="btn-run-claude" id="btnRunClaude" onclick="runWithClaude()" disabled>
+              ▶ Run with Claude
+            </button>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);line-height:1.5" id="companionHint">
+            Start the companion first:
+            <code style="font-size:10px;background:var(--surface2);padding:2px 6px;border-radius:3px;border:1px solid var(--border)">node agent-sdd/companion.js</code>
+          </div>
+        </div>
+
+        <!-- Terminal output panel -->
+        <div class="claude-terminal" id="claudeTerminal">
+          <div class="claude-terminal-header">
+            <div class="claude-terminal-title">
+              <div class="terminal-spinner" id="terminalSpinner"></div>
+              <span id="terminalTitle">Claude Output</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('claudeTerminal').classList.remove('visible')">✕</button>
+          </div>
+          <div class="claude-terminal-body" id="claudeTerminalBody"></div>
+        </div>
+      </div>
+
     </div>
   </div>`;
 }
@@ -1068,7 +1344,7 @@ function showFolderInterstitial(platformName) {
       <div style="font-size:48px;margin-bottom:20px">📂</div>
       <h2 style="margin:0 0 10px;font-size:22px;font-weight:700">Select your ${label} project folder</h2>
       <p style="color:var(--text-muted);font-size:14px;line-height:1.7;margin:0 0 32px">
-        Point the wizard at your project root so it can auto-detect your stack and save all generated files directly into <code>agent-sdd-output/</code> inside it.
+        Point the wizard at your project root so it can auto-detect your stack and save all generated files directly into <code>agent-artifacts/</code> inside it.
       </p>
       <button id="folderInterstitialBtn" class="btn btn-primary" style="width:100%;justify-content:center;font-size:15px;padding:14px 24px;margin-bottom:16px">
         📂 Select Project Folder
@@ -1093,11 +1369,13 @@ function showFolderInterstitial(platformName) {
         if (badge) { badge.textContent = '📂 ' + handle.name; badge.className = 'folder-badge granted'; }
         const pathEl = document.getElementById('cfg-codebase-path');
         if (pathEl && !pathEl.value) pathEl.value = '..';
-        tryReadFile(handle, 'agent-sdd-output', 'project.config.md').then(existing => {
+        tryReadFile(handle, 'agent-artifacts', 'project.config.md').then(existing => {
           if (existing) loadExistingConfig(existing);
         });
         showToast('Project folder set: ' + handle.name + ' — analysing…', 'success');
         PLATFORM.onFolderGranted?.();
+        // Light up sidebar ✅ for any steps whose output files already exist
+        detectExistingOutputFiles(handle);
       }
     }, 200);
   };
@@ -1129,4 +1407,5 @@ document.addEventListener('keydown', e => {
 // once the user selects a platform and its script has loaded.
 window.addEventListener('DOMContentLoaded', () => {
   applyBrowserCompat();
+  startCompanionPolling();
 });
