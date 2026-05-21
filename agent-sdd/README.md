@@ -149,6 +149,10 @@ Click **💾 Save** on each step. Files are written directly into `agent-artifac
 inside your project folder — the folder is created automatically on the first save.
 The sidebar shows ✅ for saved steps.
 
+When you save the **final step (Data Model)**, the wizard automatically:
+- ✅ Creates `agent-artifacts/CLAUDE.md` (read-only snapshot)
+- ✅ Copies content from `agent-sdd/CLAUDE.md`
+
 After saving, open each generated file and replace any `[fill in]` placeholders
 with your project-specific details.
 
