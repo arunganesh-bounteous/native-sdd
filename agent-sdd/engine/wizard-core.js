@@ -94,23 +94,31 @@ The file header reads \`HUMAN-AUTHORED\`.
 
 ## Step 1 — Load Tiered Context (always in this order)
 
-Load every tier before reading the task. Do not skip tiers.
+Attempt every tier before reading the task. **If a file does not exist, skip it silently and
+note the gap — do not stop execution.** A missing optional spec file means reduced guidance
+in that area, not a blocking error.
 
 | Tier | What to load | Condition |
 |------|-------------|-----------|
-| 1 | \`agent-artifacts/spec-kit/ARCHITECTURE.md\` + \`agent-artifacts/spec-kit/MODULE_MAP.md\` | Always |
-| 2 | \`agent-artifacts/spec-kit/CONVENTIONS.md\` + \`agent-artifacts/spec-kit/MIGRATION_RULES.md\` + \`agent-artifacts/spec-kit/TESTING.md\` | Always |
-| 3 | \`agent-artifacts/context/_index.md\` → match task keywords → load \`agent-artifacts/context/<module>.md\` for each match | Always |
-| 4 | Relevant sections of \`agent-artifacts/spec-kit/TECH_DEBT.md\` | When touching legacy code or files listed in debt register |
-| 5 | Relevant sections of \`agent-artifacts/spec-kit/DATA_MODEL.md\` | When task touches data models, APIs, DB, or network |
+| 1 | \`agent-artifacts/spec-kit/ARCHITECTURE.md\` + \`agent-artifacts/spec-kit/MODULE_MAP.md\` | Always — if missing, note the gap and continue with reduced accuracy |
+| 2 | \`agent-artifacts/spec-kit/CONVENTIONS.md\` + \`agent-artifacts/spec-kit/MIGRATION_RULES.md\` + \`agent-artifacts/spec-kit/TESTING.md\` | Load each if present — skip silently if not |
+| 3 | \`agent-artifacts/context/_index.md\` → match task keywords → load \`agent-artifacts/context/<module>.md\` for each match | Load if present — if \`_index.md\` is missing, skip Tier 3 entirely |
+| 4 | Relevant sections of \`agent-artifacts/spec-kit/TECH_DEBT.md\` | If present and touching legacy code or files listed in debt register |
+| 5 | Relevant sections of \`agent-artifacts/spec-kit/DATA_MODEL.md\` | If present and task touches data models, APIs, DB, or network |
 | 6 | Source files listed in the loaded context files that are expected to change | Per task |
+
+**Missing file behaviour:**
+- Tier 1 missing → state in Understanding: "ARCHITECTURE.md / MODULE_MAP.md not found — proceeding without structural context"
+- Tier 2 file missing → skip that file, apply platform defaults for that area
+- Tier 3 missing → skip module context lookup, read source files directly
+- Tiers 4–5 missing → skip, do not mention
 
 **Multi-module tasks:** If the task touches more than one module, load all matching
 context files (Tier 3) before reading any source files.
 
 **Module not in context/:** Check \`agent-artifacts/spec-kit/MODULE_MAP.md\` by module name. If still
 not found, read 5–8 key source files in that area, execute the task, then generate
-a \`agent-artifacts/context/<module>.md\` file afterward using \`agent-sdd/context/TEMPLATE.md\`.
+a \`agent-artifacts/context/<module>.md\` file afterward using \`agent-artifacts/context/TEMPLATE.md\`.
 
 ---
 
@@ -1161,9 +1169,15 @@ const STEP_TUTORIALS = {
 // ══════════════════════════════════════════════════════
 //  SIDEBAR
 // ══════════════════════════════════════════════════════
+
+// Steps the user can skip on first run and fill in later.
+// Core steps (projectconfig, architecture, modules) are not in this set.
+const OPTIONAL_STEP_IDS = new Set(['conventions', 'migrations', 'debt', 'testing', 'datamodel']);
+
 function buildSidebar() {
   const container = document.getElementById('sidebarSteps');
-  container.innerHTML = STEPS.map(s => `
+
+  const renderStep = s => `
     <div class="step-item ${s.id === state.current ? 'active' : ''} ${state.saved[s.id] ? 'done' : ''}"
          id="nav-${s.id}" onclick="goTo('${s.id}')">
       <span class="step-icon">${state.saved[s.id] ? '✅' : s.icon}</span>
@@ -1172,8 +1186,24 @@ function buildSidebar() {
         ${s.file ? `<div class="step-file">${s.file}</div>` : ''}
         ${s.artifact ? `<div class="step-artifact-badge">⚡ AI artifact</div>` : ''}
       </div>
-    </div>
-  `).join('');
+    </div>`;
+
+  // Split content steps into core and optional — welcome/done are excluded
+  const contentSteps = STEPS.filter(s => s.file);
+  const coreSteps     = contentSteps.filter(s => !OPTIONAL_STEP_IDS.has(s.id));
+  const optionalSteps = contentSteps.filter(s =>  OPTIONAL_STEP_IDS.has(s.id));
+
+  const sectionLabel = text => `
+    <div style="padding:8px 16px 4px;font-size:10px;font-weight:700;
+      color:var(--text-dim);text-transform:uppercase;letter-spacing:0.8px">
+      ${text}
+    </div>`;
+
+  container.innerHTML =
+    sectionLabel('Core') +
+    coreSteps.map(renderStep).join('') +
+    sectionLabel('Optional') +
+    optionalSteps.map(renderStep).join('');
 }
 
 function goTo(id) {
@@ -1271,6 +1301,43 @@ function _goTo(id) {
   } else {
     document.getElementById('previewPanel').classList.add('collapsed');
   }
+
+  // Show or hide the "Skip for now" banner depending on whether this is an optional step
+  updateSkipBanner(id, step);
+}
+
+function updateSkipBanner(id, step) {
+  // Remove any existing banner first
+  document.getElementById('optionalSkipBanner')?.remove();
+  if (!step?.file || !OPTIONAL_STEP_IDS.has(id)) return;
+
+  // Find the next unsaved core or optional step to navigate to after skipping
+  const contentSteps = STEPS.filter(s => s.file);
+  const currentIdx   = contentSteps.findIndex(s => s.id === id);
+  const nextStep     = contentSteps[currentIdx + 1];
+
+  const banner = document.createElement('div');
+  banner.id = 'optionalSkipBanner';
+  banner.style.cssText = `
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.25);
+    border-radius:8px;padding:10px 14px;margin-bottom:16px;flex-shrink:0;
+  `;
+  banner.innerHTML = `
+    <div style="font-size:12px;color:var(--text-dim);line-height:1.4">
+      <span style="color:var(--accent);font-weight:600">Optional</span> — you can skip this and fill it in later.
+      The agent will work without it but with reduced accuracy in this area.
+    </div>
+    <button onclick="${nextStep ? `goTo('${nextStep.id}')` : `goTo('done')`}"
+      style="flex-shrink:0;padding:6px 14px;border-radius:6px;border:1px solid var(--border);
+      background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;white-space:nowrap">
+      Skip for now →
+    </button>
+  `;
+
+  // Inject at the top of the active screen's content
+  const screen = document.getElementById('screen-' + id);
+  if (screen) screen.prepend(banner);
 }
 
 // ══════════════════════════════════════════════════════
@@ -1403,16 +1470,66 @@ function attachDraftListeners(screenId) {
 // ══════════════════════════════════════════════════════
 const hasFSA = 'showDirectoryPicker' in window;
 
-// Show a warning banner when File System Access API is unavailable (Safari, Firefox).
-// Called once after DOMContentLoaded — banner is hidden by default in HTML.
+// Show a blocking modal when File System Access API is unavailable (Safari, Firefox).
+// The user must acknowledge before the wizard proceeds — the dismissable banner was
+// too easy to miss and led to confusion about missing files.
 function applyBrowserCompat() {
   if (!hasFSA) {
-    const banner = document.getElementById('safariBanner');
-    if (banner) banner.style.display = 'block';
-    // Grey out the Select button tooltip
-    const selectBtn = document.querySelector('button[onclick="grantFolder()"]');
-    if (selectBtn) selectBtn.title = 'Direct folder access not supported in this browser — files will download to your Downloads folder instead.';
+    showBrowserBlockModal();
   }
+}
+
+function showBrowserBlockModal() {
+  const modal = document.createElement('div');
+  modal.id = 'browserBlockModal';
+  modal.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;
+    display:flex;align-items:center;justify-content:center;
+  `;
+  modal.innerHTML = `
+    <div style="background:var(--surface2);border:1px solid #f59e0b;border-radius:14px;
+      padding:32px 36px;max-width:480px;width:90%;box-shadow:0 16px 48px rgba(0,0,0,0.6);text-align:center;">
+      <div style="font-size:36px;margin-bottom:16px">⚠️</div>
+      <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:10px">
+        Chrome or Edge required
+      </div>
+      <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:20px">
+        This browser doesn't support the <strong>File System Access API</strong> needed to write
+        files directly into your project folder.<br><br>
+        Without it, the wizard <strong>cannot auto-create</strong> your
+        <code style="background:var(--bg);padding:1px 5px;border-radius:3px;font-size:11px">agent-artifacts/</code>
+        folder — including <code style="background:var(--bg);padding:1px 5px;border-radius:3px;font-size:11px">CLAUDE.md</code>,
+        tasks, context files, and hooks.
+      </div>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+        <a href="https://www.google.com/chrome/" target="_blank"
+          style="padding:10px 20px;border-radius:8px;background:#4285f4;color:#fff;
+          text-decoration:none;font-size:13px;font-weight:600">
+          Download Chrome
+        </a>
+        <a href="https://www.microsoft.com/edge" target="_blank"
+          style="padding:10px 20px;border-radius:8px;background:#0078d4;color:#fff;
+          text-decoration:none;font-size:13px;font-weight:600">
+          Download Edge
+        </a>
+      </div>
+      <div style="margin-top:16px">
+        <button onclick="acknowledgeBrowserLimit()"
+          style="background:none;border:none;color:var(--text-muted);cursor:pointer;
+          font-size:12px;text-decoration:underline;">
+          I understand — continue anyway (files will download individually)
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+function acknowledgeBrowserLimit() {
+  document.getElementById('browserBlockModal')?.remove();
+  // Show the softer banner as a persistent reminder after dismissal
+  const banner = document.getElementById('safariBanner');
+  if (banner) banner.style.display = 'block';
 }
 
 // ══════════════════════════════════════════════════════
@@ -1444,6 +1561,11 @@ async function grantFolder() {
 
     // Light up sidebar ✅ for any steps whose output files already exist
     detectExistingOutputFiles(handle);
+
+    // Write base files immediately — CLAUDE.md, tasks/, context/, hooks/
+    // These are project-agnostic and should be present from day one,
+    // even if the user doesn't complete all wizard steps in this session.
+    await writeBaseArtifacts();
   } catch (e) {
     if (e.name !== 'AbortError') showToast('Could not access folder — try selecting the folder again.', 'error');
   }
@@ -1456,8 +1578,12 @@ async function grantFolder() {
 async function detectExistingOutputFiles(handle) {
   if (!handle) return;
 
-  let completedCount = 0;
+  // Reset all step save states before checking — clears stale ✅ from
+  // localStorage that belong to a previous project or session.
   const contentSteps = STEPS.filter(s => s.file);
+  contentSteps.forEach(s => { state.saved[s.id] = false; });
+
+  let completedCount = 0;
 
   await Promise.all(contentSteps.map(async step => {
     const parts = step.file.split('/');    // e.g. 'spec-kit/ARCHITECTURE.md' → ['spec-kit','ARCHITECTURE.md']
@@ -1578,56 +1704,55 @@ async function saveFile(relativePath, content) {
   }
 }
 
-// Called when final wizard step is saved — creates the complete agent-artifacts structure
-async function createCompleteArtifactsStructure() {
+// Writes all project-agnostic base files to agent-artifacts/.
+// Called immediately after folder grant AND again when the final wizard step is saved
+// (to pick up any CLAUDE.md content updates). Safe to call multiple times — idempotent.
+async function writeBaseArtifacts(silent = false) {
   if (!state.dirHandle || !hasFSA) return;
 
-  console.log('🚀 Creating complete agent-artifacts structure...');
-  const results = [];
+  const files = [
+    ['CLAUDE.md',                          EMBEDDED_CLAUDE_MD],
+    ['tasks/TASK_TEMPLATE.md',             EMBEDDED_TASK_TEMPLATE],
+    ['tasks/BOOTSTRAP_TEMPLATE.md',        EMBEDDED_BOOTSTRAP_TEMPLATE],
+    ['context/TEMPLATE.md',                EMBEDDED_CONTEXT_TEMPLATE],
+    ['context/_index.md',                  EMBEDDED_CONTEXT_INDEX],
+    ['hooks/settings.json',                EMBEDDED_HOOKS_SETTINGS],
+    ['hooks/scripts/protected-paths.sh',   EMBEDDED_PROTECTED_PATHS_SH],
+    ['hooks/scripts/lint-gate.sh',         EMBEDDED_LINT_GATE_SH],
+    ['hooks/scripts/done-gate.sh',         EMBEDDED_DONE_GATE_SH],
+  ];
 
-  // Helper to track results
-  const write = async (path, content) => {
+  let failed = 0;
+  for (const [path, content] of files) {
     const ok = await saveFile(path, content);
-    results.push({ path, ok });
-    console.log(ok ? `  ✅ ${path}` : `  ❌ ${path}`);
-    return ok;
-  };
-
-  // ── CLAUDE.md ─────────────────────────────────────────
-  await write('CLAUDE.md', EMBEDDED_CLAUDE_MD);
-
-  // ── tasks/ ────────────────────────────────────────────
-  await write('tasks/TASK_TEMPLATE.md',      EMBEDDED_TASK_TEMPLATE);
-  await write('tasks/BOOTSTRAP_TEMPLATE.md', EMBEDDED_BOOTSTRAP_TEMPLATE);
-
-  // ── context/ ──────────────────────────────────────────
-  await write('context/TEMPLATE.md', EMBEDDED_CONTEXT_TEMPLATE);
-  await write('context/_index.md',   EMBEDDED_CONTEXT_INDEX);
-
-  // ── hooks/ staged inside agent-artifacts/ ─────────────
-  // Browser FSA cannot create hidden folders (.claude/) directly.
-  // Files are staged here; user runs one command to install them.
-  await write('hooks/settings.json',              EMBEDDED_HOOKS_SETTINGS);
-  await write('hooks/scripts/protected-paths.sh', EMBEDDED_PROTECTED_PATHS_SH);
-  await write('hooks/scripts/lint-gate.sh',       EMBEDDED_LINT_GATE_SH);
-  await write('hooks/scripts/done-gate.sh',       EMBEDDED_DONE_GATE_SH);
-
-  const failed = results.filter(r => !r.ok);
-  const succeeded = results.filter(r => r.ok).length;
-
-  if (failed.length === 0) {
-    showToast('✅ Setup complete! All agent-artifacts files created.', 'success');
-  } else {
-    showToast(`⚠️  Setup complete with ${failed.length} skipped file(s) — check console`, 'info');
+    if (!ok) failed++;
   }
 
-  console.log(`🏁 Done. ${succeeded}/${results.length} files created.`);
-  console.log('');
+  if (!silent) {
+    if (failed === 0) {
+      showToast('✅ Base files written — CLAUDE.md, tasks, context, and hooks are ready.', 'success');
+    } else {
+      showToast(`⚠️  ${failed} file(s) could not be written — check console`, 'info');
+    }
+  }
+}
+
+// Called when final wizard step is saved — re-writes base files (picks up latest
+// CLAUDE.md content) and confirms setup is complete.
+async function createCompleteArtifactsStructure() {
+  if (!state.dirHandle || !hasFSA) {
+    // Non-FSA browser (Safari) — download the auto-generated files individually
+    // with an overlay explaining where to place each one.
+    downloadArtifactsFallback();
+    return;
+  }
+
+  await writeBaseArtifacts(true); // silent — toast shown below
+  showToast('✅ Setup complete! All agent-artifacts files are ready.', 'success');
+
   console.log('📌 Final step — install Claude Code hooks from your project terminal:');
   console.log('   cp -r agent-artifacts/hooks/.  .claude/');
   console.log('   chmod +x .claude/scripts/*.sh');
-  console.log('   git add .claude/ && git commit -m "Add Claude Code SDD hooks"');
-
 }
 
 function downloadFallback(filename, content) {
@@ -1636,6 +1761,72 @@ function downloadFallback(filename, content) {
   const a = document.createElement('a');
   a.href = url; a.download = filename.split('/').pop();
   a.click(); URL.revokeObjectURL(url);
+}
+
+// Safari/Firefox fallback — downloads all auto-generated files one by one
+// and shows an overlay telling the user exactly where to place each file.
+function downloadArtifactsFallback() {
+  const files = [
+    { path: 'agent-artifacts/CLAUDE.md',                           content: EMBEDDED_CLAUDE_MD },
+    { path: 'agent-artifacts/tasks/TASK_TEMPLATE.md',              content: EMBEDDED_TASK_TEMPLATE },
+    { path: 'agent-artifacts/tasks/BOOTSTRAP_TEMPLATE.md',         content: EMBEDDED_BOOTSTRAP_TEMPLATE },
+    { path: 'agent-artifacts/context/TEMPLATE.md',                 content: EMBEDDED_CONTEXT_TEMPLATE },
+    { path: 'agent-artifacts/context/_index.md',                   content: EMBEDDED_CONTEXT_INDEX },
+    { path: 'agent-artifacts/hooks/settings.json',                 content: EMBEDDED_HOOKS_SETTINGS },
+    { path: 'agent-artifacts/hooks/scripts/protected-paths.sh',    content: EMBEDDED_PROTECTED_PATHS_SH },
+    { path: 'agent-artifacts/hooks/scripts/lint-gate.sh',          content: EMBEDDED_LINT_GATE_SH },
+    { path: 'agent-artifacts/hooks/scripts/done-gate.sh',          content: EMBEDDED_DONE_GATE_SH },
+  ];
+
+  // Stagger downloads so the browser doesn't block them
+  files.forEach((f, i) => {
+    setTimeout(() => {
+      const blob = new Blob([f.content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = f.path.split('/').pop();
+      a.click();
+      URL.revokeObjectURL(url);
+    }, i * 400);
+  });
+
+  // Show placement instructions overlay
+  const modal = document.createElement('div');
+  modal.id = 'safariDownloadModal';
+  modal.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2000;
+    display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:20px 0;
+  `;
+  modal.innerHTML = `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;
+      padding:28px 32px;max-width:560px;width:90%;box-shadow:0 16px 48px rgba(0,0,0,0.5);">
+      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px">
+        📥 ${files.length} files downloaded
+      </div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:18px;line-height:1.6">
+        Move each downloaded file into your project folder using the paths below.
+        Create any missing folders as needed.
+      </div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;
+        padding:12px 16px;font-family:var(--mono);font-size:11px;line-height:2;color:var(--accent)">
+        ${files.map(f => `<div>${f.path}</div>`).join('')}
+      </div>
+      <div style="margin-top:16px;padding:12px 14px;background:rgba(245,158,11,0.08);
+        border:1px solid rgba(245,158,11,0.3);border-radius:8px;font-size:11px;color:#f59e0b;line-height:1.6">
+        💡 <strong>Tip:</strong> Switch to <strong>Chrome or Edge</strong> to have the wizard place all files
+        automatically. You won't need to do this manually.
+      </div>
+      <div style="margin-top:18px;text-align:right">
+        <button onclick="document.getElementById('safariDownloadModal').remove()"
+          style="padding:8px 20px;border-radius:6px;border:none;background:var(--accent);
+          color:var(--bg);cursor:pointer;font-size:13px;font-weight:600">
+          Got it
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
 }
 
 async function handleSave(stepId, filename, content) {
@@ -1898,13 +2089,38 @@ function selectPill(group, value, type = 'check') {
 function updateDoneScreen() {
   const screen = document.getElementById('screen-done');
   if (!screen) return;
-  const files = STEPS.filter(s => s.file);
-  screen.querySelector('.done-files').innerHTML = files.map(s => `
+
+  const files        = STEPS.filter(s => s.file);
+  const coreSteps    = files.filter(s => !OPTIONAL_STEP_IDS.has(s.id));
+  const optionalSteps = files.filter(s =>  OPTIONAL_STEP_IDS.has(s.id));
+
+  const renderFile = s => `
     <div class="done-file">
       <div class="status-dot ${state.saved[s.id] ? '' : 'pending'}"></div>
       <span style="color:${state.saved[s.id] ? 'var(--success)' : 'var(--text-muted)'}">${s.file}</span>
-    </div>
-  `).join('');
+      ${!state.saved[s.id] && OPTIONAL_STEP_IDS.has(s.id)
+        ? `<span onclick="goTo('${s.id}')" style="margin-left:auto;font-size:10px;color:var(--accent);
+            cursor:pointer;text-decoration:underline;flex-shrink:0">Fill in →</span>`
+        : ''}
+    </div>`;
+
+  const pendingOptional = optionalSteps.filter(s => !state.saved[s.id]);
+
+  screen.querySelector('.done-files').innerHTML =
+    `<div style="font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;
+       letter-spacing:0.8px;margin-bottom:6px">Core</div>` +
+    coreSteps.map(renderFile).join('') +
+    `<div style="font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;
+       letter-spacing:0.8px;margin-top:14px;margin-bottom:6px">Optional</div>` +
+    optionalSteps.map(renderFile).join('') +
+    (pendingOptional.length > 0
+      ? `<div style="margin-top:14px;padding:10px 12px;background:rgba(99,102,241,0.08);
+           border:1px solid rgba(99,102,241,0.2);border-radius:8px;font-size:12px;
+           color:var(--text-dim);line-height:1.5">
+           ${pendingOptional.length} optional step${pendingOptional.length > 1 ? 's' : ''} pending.
+           The agent will work now — fill these in when you're ready to improve accuracy.
+         </div>`
+      : '');
 }
 
 function updatePreview(stepId) {
@@ -2039,6 +2255,9 @@ function init() {
   // Build platform-agnostic task creation screen
   buildTaskScreen(fp);
   attachDraftListeners('screen-newtask');
+
+  // Build CLAUDE.md viewer screen
+  buildClaudeMdScreen(fp);
 
   // Attach draft save listeners to every non-welcome, non-done screen
   stepIds.forEach(id => {
@@ -2357,6 +2576,79 @@ function buildTaskScreen(fp) {
 }
 
 // ══════════════════════════════════════════════════════
+//  CLAUDE.MD VIEWER
+//  Read-only screen showing the embedded CLAUDE.md content
+//  so users understand what the agent is instructed with.
+// ══════════════════════════════════════════════════════
+
+function buildClaudeMdScreen(fp) {
+  fp.innerHTML += `
+  <div class="step-screen" id="screen-claudemd">
+    <div style="max-width:800px">
+      <div class="form-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:gap">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">
+              Agent Instructions — CLAUDE.md
+            </div>
+            <div style="font-size:12px;color:var(--text-dim);line-height:1.5">
+              This is the instruction set written to <code style="font-size:11px;background:var(--bg);padding:1px 5px;border-radius:3px;border:1px solid var(--border)">agent-artifacts/CLAUDE.md</code>
+              when you complete setup. Claude reads this at the start of every task session.
+              It is read-only — to customise agent behaviour use <code style="font-size:11px;background:var(--bg);padding:1px 5px;border-radius:3px;border:1px solid var(--border)">spec-kit/CONVENTIONS.md</code>.
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="copyCLAUDEmdToClipboard()"
+            style="flex-shrink:0;margin-left:16px">📋 Copy</button>
+        </div>
+        <div id="claudemd-render" style="
+          background:var(--bg);border:1px solid var(--border);border-radius:8px;
+          padding:20px 24px;font-size:12.5px;line-height:1.7;color:var(--text);
+          max-height:calc(100vh - 220px);overflow-y:auto;
+        "></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function goToClaudeMdScreen() {
+  const leavingStep = STEPS.find(s => s.id === state.current);
+  if (state.dirty && leavingStep?.file) {
+    showUnsavedWarning(leavingStep.label, () => _goToClaudeMdScreen());
+    return;
+  }
+  _goToClaudeMdScreen();
+}
+
+function _goToClaudeMdScreen() {
+  state.dirty = false;
+  state.current = 'claudemd';
+  document.querySelectorAll('.step-screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-claudemd')?.classList.add('active');
+  const fp = document.querySelector('.form-panel');
+  if (fp) fp.scrollTop = 0;
+  buildSidebar();
+  document.getElementById('headerTitle').textContent = 'CLAUDE.md';
+  document.getElementById('headerDesc').textContent = 'Agent instruction set — written to agent-artifacts/CLAUDE.md on setup complete';
+  const tutLink = document.getElementById('headerTutorial');
+  if (tutLink) tutLink.style.display = 'none';
+  document.getElementById('previewPanel').classList.add('collapsed');
+  document.querySelectorAll('.tool-link').forEach(l => l.classList.remove('tool-active'));
+  document.getElementById('tool-claudemd')?.classList.add('tool-active');
+
+  // Render EMBEDDED_CLAUDE_MD as markdown
+  const container = document.getElementById('claudemd-render');
+  if (container) container.innerHTML = renderMarkdown(EMBEDDED_CLAUDE_MD);
+}
+
+function copyCLAUDEmdToClipboard() {
+  navigator.clipboard.writeText(EMBEDDED_CLAUDE_MD).then(() => {
+    showToast('CLAUDE.md copied to clipboard', 'success');
+  }).catch(() => {
+    showToast('Copy failed — try selecting the text manually', 'error');
+  });
+}
+
+// ══════════════════════════════════════════════════════
 //  PLATFORM SELECTION
 //  Dynamically loads platform-android.js or platform-ios.js
 //  after the user picks a platform from the overlay.
@@ -2430,6 +2722,8 @@ function showFolderInterstitial(platformName) {
         PLATFORM.onFolderGranted?.();
         // Light up sidebar ✅ for any steps whose output files already exist
         detectExistingOutputFiles(handle);
+        // Write base files immediately — CLAUDE.md, tasks/, context/, hooks/
+        writeBaseArtifacts();
       }
     }, 200);
   };

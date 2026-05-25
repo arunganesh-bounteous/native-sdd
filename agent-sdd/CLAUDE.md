@@ -82,23 +82,31 @@ The file header reads `HUMAN-AUTHORED`.
 
 ## Step 1 — Load Tiered Context (always in this order)
 
-Load every tier before reading the task. Do not skip tiers.
+Attempt every tier before reading the task. **If a file does not exist, skip it silently and
+note the gap — do not stop execution.** A missing optional spec file means reduced guidance
+in that area, not a blocking error.
 
 | Tier | What to load | Condition |
 |------|-------------|-----------|
-| 1 | `agent-artifacts/spec-kit/ARCHITECTURE.md` + `agent-artifacts/spec-kit/MODULE_MAP.md` | Always |
-| 2 | `agent-artifacts/spec-kit/CONVENTIONS.md` + `agent-artifacts/spec-kit/MIGRATION_RULES.md` + `agent-artifacts/spec-kit/TESTING.md` | Always |
-| 3 | `agent-artifacts/context/_index.md` → match task keywords → load `agent-artifacts/context/<module>.md` for each match | Always |
-| 4 | Relevant sections of `agent-artifacts/spec-kit/TECH_DEBT.md` | When touching legacy code or files listed in debt register |
-| 5 | Relevant sections of `agent-artifacts/spec-kit/DATA_MODEL.md` | When task touches data models, APIs, DB, or network |
+| 1 | `agent-artifacts/spec-kit/ARCHITECTURE.md` + `agent-artifacts/spec-kit/MODULE_MAP.md` | Always — if missing, note the gap and continue with reduced accuracy |
+| 2 | `agent-artifacts/spec-kit/CONVENTIONS.md` + `agent-artifacts/spec-kit/MIGRATION_RULES.md` + `agent-artifacts/spec-kit/TESTING.md` | Load each if present — skip silently if not |
+| 3 | `agent-artifacts/context/_index.md` → match task keywords → load `agent-artifacts/context/<module>.md` for each match | Load if present — if `_index.md` is missing, skip Tier 3 entirely |
+| 4 | Relevant sections of `agent-artifacts/spec-kit/TECH_DEBT.md` | If present and touching legacy code or files listed in debt register |
+| 5 | Relevant sections of `agent-artifacts/spec-kit/DATA_MODEL.md` | If present and task touches data models, APIs, DB, or network |
 | 6 | Source files listed in the loaded context files that are expected to change | Per task |
+
+**Missing file behaviour:**
+- Tier 1 missing → state in Understanding: "ARCHITECTURE.md / MODULE_MAP.md not found — proceeding without structural context"
+- Tier 2 file missing → skip that file, apply platform defaults for that area
+- Tier 3 missing → skip module context lookup, read source files directly
+- Tiers 4–5 missing → skip, do not mention
 
 **Multi-module tasks:** If the task touches more than one module, load all matching
 context files (Tier 3) before reading any source files.
 
 **Module not in context/:** Check `agent-artifacts/spec-kit/MODULE_MAP.md` by module name. If still
 not found, read 5–8 key source files in that area, execute the task, then generate
-a `agent-artifacts/context/<module>.md` file afterward using `agent-sdd/context/TEMPLATE.md`.
+a `agent-artifacts/context/<module>.md` file afterward using `agent-artifacts/context/TEMPLATE.md`.
 
 ---
 
