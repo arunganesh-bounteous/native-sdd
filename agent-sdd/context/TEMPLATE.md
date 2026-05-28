@@ -36,7 +36,8 @@
 
 ## State Management
 
-[Describe how state flows through this module. What the ViewModel exposes. Sealed class shapes.]
+[Only describe StateFlow / LiveData / sealed class shapes you directly read in source.
+Do NOT invent domain types not seen in the code.]
 
 ```kotlin
 // Example — fill in actual state for this module:
@@ -52,7 +53,10 @@ sealed interface [Name]UiState {
 
 ## Dependencies
 
-- **Depends on**: [list modules this imports — e.g., `:core-network`, `:core-data`]
+<!-- Evidence rule: list only what appears in import statements of files you read.
+     Do NOT describe what an SDK does internally — list its name only.
+     For anything unconfirmed write: [not confirmed — verify with team] -->
+- **Depends on**: [list import names — e.g., `:core-network`, `OloSDK`]
 - **Depended on by**: [list modules that import this — e.g., `:app` (NavGraph)]
 
 ---
@@ -78,9 +82,11 @@ No debt — leave this section empty if none.
 
 ## What the Agent Should Know
 
-[Non-obvious facts. Gotchas. Invariants. Workarounds that must not be removed. Side effects.]
+<!-- Evidence rule: only document concrete behaviors observed in source code.
+     Valid: "ProfileFragment calls authService.logout() directly — not via ViewModel"
+     Invalid: "The SDK handles session management internally"
+     For anything unconfirmed write: [not confirmed — verify with team] -->
 
-Examples of what belongs here:
 - "Never call [Class] directly from ViewModel — always through [UseCase]"
 - "[Field] is nullable in the API response but the UI assumes non-null — guard here"
 - "The [workaround] in [File]:L42 exists because [reason] — do not simplify it"

@@ -514,29 +514,67 @@ No production code is created or modified.
 Replace \`[Module Name]\` and the file paths below with the actual module details
 from \`spec-kit/MODULE_MAP.md\` before running.
 
+---
+
+## ⚠ EVIDENCE-ONLY RULE — Read this before writing anything
+
+Every line in the context file must be directly supported by something you read
+in a source file during this task.
+
+**Never infer. Never assume. Never fill gaps with what a library "typically" does.**
+
+Specific prohibitions:
+
+- **Dependencies**: List only what appears in \`import\` statements of the files you
+  read. Do NOT describe what an imported SDK does internally — only list its name.
+  Violation example: "NomNomCore SDK handles authentication."
+  Correct: "Depends on: NomNomCore (import seen in AuthViewModel.kt)"
+
+- **State Management**: Only describe \`StateFlow\`, \`LiveData\`, or \`sealed class\` shapes
+  you directly read. Do NOT invent domain types (e.g., \`AppBasket\`) that you did not
+  see declared in a source file.
+
+- **What the Agent Should Know**: Only document concrete behaviors you observed in code
+  (e.g., "ProfileFragment calls authService.logout() directly on line 84"). Never infer
+  a behavior from a class name or SDK reputation.
+
+- **Purpose / "Does NOT handle"**: Only exclude a responsibility if you read a file and
+  confirmed it is absent. Do not assume from folder names alone.
+
+If you cannot confirm something from the files you read, write:
+\`[not confirmed — verify with team]\`
+
+Do not leave sections blank to avoid this — write the placeholder explicitly.
+A visible gap is safer than a confident wrong answer.
+
+---
+
 ## Acceptance Criteria
 
 - [ ] \`context/<module>.md\` exists and follows the structure in \`context/TEMPLATE.md\`
-- [ ] Key Files table is populated with actual file paths (relative to \`codebase_path\`)
-- [ ] State Management section describes what the ViewModel exposes (or notes "N/A" if no ViewModel)
-- [ ] Dependencies section lists what this module imports and what imports it
-- [ ] "What the Agent Should Know" section contains at least one non-obvious fact, or notes "None found"
-- [ ] Known Debt section lists any OPEN patterns found during the scan, or notes "None found"
-- [ ] Tests section lists existing test files, or notes "No tests found"
+- [ ] Key Files table lists only files that were actually read and verified to exist
+- [ ] State Management describes only ViewModel/StateFlow shapes seen in source, or "N/A"
+- [ ] Dependencies lists import names only — no description of what SDKs do internally
+- [ ] "What the Agent Should Know" contains only facts directly observed in source, or "None found"
+- [ ] Known Debt lists debt patterns actually seen in scanned files, or "None found"
+- [ ] Tests section lists existing test files found, or "No tests found"
 - [ ] A routing row for this module is added to \`context/_index.md\`
+- [ ] No section contains an inference — every claim traces to a file you read
 
 ## Quality Gate
 
 - [ ] No production source files were created or modified
 - [ ] No \`spec-kit/\` files were modified (read-only)
 - [ ] Context file uses the exact section structure from \`context/TEMPLATE.md\`
-- [ ] All file paths in Key Files table are verified to exist
+- [ ] All file paths in Key Files table are verified to exist (attempted to open each)
+- [ ] Any unconfirmed claim is explicitly marked \`[not confirmed — verify with team]\`
 
 ## Out of Scope
 
 - Do NOT fix any code issues discovered during the scan — log them in the completion report
 - Do NOT create unit tests — this is a read-only discovery run
 - Do NOT modify \`spec-kit/MODULE_MAP.md\` — add routing to \`context/_index.md\` only
+- Do NOT describe SDK internals beyond what the import statement shows
 
 ## Module to Bootstrap
 
@@ -560,20 +598,31 @@ Context file:   [e.g., context/profile.md]
 ## Steps for the Agent
 
 1. Read \`agent-artifacts/spec-kit/MODULE_MAP.md\` — find the entry for the module being bootstrapped.
-2. Read the key source files listed in the \`Key classes\` field.
-3. For each file: extract purpose, public interface, state shape, and dependencies.
-4. Scan for tech debt patterns listed in \`agent-artifacts/spec-kit/TECH_DEBT.md\`.
-5. Scan for existing test files (\`*Test.kt\`, \`*Spec.kt\`) in the module path.
-6. Populate \`agent-artifacts/context/TEMPLATE.md\` fields from what you observed.
-7. Save as \`agent-artifacts/context/<module>.md\`.
-8. Add a routing row to \`agent-artifacts/context/_index.md\`.
-9. Write a completion report listing what was found and any debt or gaps discovered.
+2. Read each source file listed in the \`Key classes\` field. If a file cannot be opened, note it as
+   \`[not read]\` in the Key Files table — do not infer its contents.
+3. For each file you successfully read:
+   - Note the exact class name, file path, and declared purpose (from KDoc/comments if present)
+   - Note any \`StateFlow\`, \`LiveData\`, or \`sealed class\` shapes declared in the file
+   - Note \`import\` statements for the Dependencies section (list names only — no descriptions)
+   - Note any \`!!\` operators, \`GlobalScope\`, or \`LiveData\` fields for the Known Debt section
+4. Scan for existing test files (\`*Test.kt\`, \`*Spec.kt\`) in the module path.
+5. Write the context file filling in ONLY what you directly observed in steps 2–4.
+   For anything you could not confirm, write \`[not confirmed — verify with team]\`.
+6. Save as \`agent-artifacts/context/<module>.md\`.
+7. Add a routing row to \`agent-artifacts/context/_index.md\`.
+8. Write a completion report:
+   - Files successfully read
+   - Files that could not be opened (list as gaps)
+   - Any \`[not confirmed]\` placeholders left — the team must review these before the file is used
 
 ## Notes
 
 Bootstrap runs are fast — typically 5–8 source file reads per module.
 Do all modules in \`spec-kit/MODULE_MAP.md\` before starting feature tickets.
 Modules bootstrapped first: those most commonly touched by the current backlog.
+
+**A context file with \`[not confirmed]\` placeholders is better than one with confident wrong answers.**
+The team can fill gaps in minutes; they cannot easily detect silent errors.
 `;
 
 // ── Embedded: context/TEMPLATE.md ─────────────────────
@@ -615,7 +664,8 @@ const EMBEDDED_CONTEXT_TEMPLATE = `# context/[module-name].md
 
 ## State Management
 
-[Describe how state flows through this module. What the ViewModel exposes. Sealed class shapes.]
+[Only describe StateFlow / LiveData / sealed class shapes you directly read in source.
+Do NOT invent domain types not seen in the code.]
 
 \`\`\`kotlin
 // Example — fill in actual state for this module:
@@ -631,7 +681,10 @@ sealed interface [Name]UiState {
 
 ## Dependencies
 
-- **Depends on**: [list modules this imports — e.g., \`:core-network\`, \`:core-data\`]
+<!-- Evidence rule: list only what appears in import statements of files you read.
+     Do NOT describe what an SDK does internally — list its name only.
+     For anything unconfirmed write: [not confirmed — verify with team] -->
+- **Depends on**: [list import names — e.g., \`:core-network\`, \`OloSDK\`]
 - **Depended on by**: [list modules that import this — e.g., \`:app\` (NavGraph)]
 
 ---
@@ -657,7 +710,10 @@ No debt — leave this section empty if none.
 
 ## What the Agent Should Know
 
-[Non-obvious facts. Gotchas. Invariants. Workarounds that must not be removed. Side effects.]
+<!-- Evidence rule: only document concrete behaviors observed in source code.
+     Example of valid entry: "ProfileFragment calls authService.logout() directly — not via ViewModel"
+     Example of invalid entry: "The SDK handles session management internally"
+     For anything unconfirmed write: [not confirmed — verify with team] -->
 
 - "Never call [Class] directly from ViewModel — always through [UseCase]"
 - "[Field] is nullable in the API response but the UI assumes non-null — guard here"
