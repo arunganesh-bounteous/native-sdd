@@ -773,6 +773,9 @@ function buildArchitectureScreen(fp) {
     <div class="form-section">
       <h3>Architecture Pattern ${tierBadge('core')}</h3>
       <div class="form-sub">
+        <strong>Select the architecture your app currently uses</strong> — this tells the agent how to read existing code.
+        If you're migrating to a different pattern, use the <em>Target Architecture Notes</em> field below to describe where you're heading.
+        The agent will write new code to the target, and use Migration Rules to guard against expanding the legacy pattern.<br><br>
         <strong>MVVM</strong> — ViewModel + StateFlow + Repository. Most common modern Android pattern.<br>
         <strong>MVP</strong> — Presenter + View interface. Legacy pattern; use Migration Rules to guard new code.<br>
         <strong>MVC</strong> — Controller in Activity/Fragment. Legacy; same guard approach as MVP.<br>

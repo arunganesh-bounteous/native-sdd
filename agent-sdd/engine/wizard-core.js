@@ -1402,7 +1402,10 @@ function updateSkipBanner(id, step) {
 //  Cleared field-by-field only when the user explicitly saves a step.
 // ══════════════════════════════════════════════════════
 
-const DRAFT_KEY = 'sdd-wizard-draft';
+// Namespaced by project folder so switching projects never cross-contaminates form data.
+function draftKey() {
+  return state.dirHandle ? `sdd-wizard-draft:${state.dirHandle.name}` : 'sdd-wizard-draft';
+}
 
 // Snapshot all current form values + selected pills → localStorage.
 let _draftTimer = null;
@@ -1439,7 +1442,7 @@ function saveDraft() {
       draft.pills[group].push(input.value);
     });
 
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    localStorage.setItem(draftKey(), JSON.stringify(draft));
   }, 300); // debounce — don't thrash storage on every keystroke
 }
 
@@ -1447,7 +1450,7 @@ function saveDraft() {
 // to pre-fill cards whose textareas don't exist in the DOM yet).
 function getDraftField(fieldId) {
   try {
-    const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}');
+    const draft = JSON.parse(localStorage.getItem(draftKey()) || '{}');
     return draft.fields?.[fieldId] ?? '';
   } catch { return ''; }
 }
@@ -1456,7 +1459,7 @@ function getDraftField(fieldId) {
 // Called once after all screens are built.
 function restoreDraft() {
   let draft;
-  try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}'); }
+  try { draft = JSON.parse(localStorage.getItem(draftKey()) || '{}'); }
   catch { return; }
   if (!draft.fields && !draft.pills) return;
 
@@ -1505,11 +1508,31 @@ function restoreDraft() {
 // after a refresh the sidebar can show ✅ for already-saved steps.
 function markDraftSaved(stepId) {
   try {
-    const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}');
+    const draft = JSON.parse(localStorage.getItem(draftKey()) || '{}');
     if (!draft.savedSteps) draft.savedSteps = [];
     if (!draft.savedSteps.includes(stepId)) draft.savedSteps.push(stepId);
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    localStorage.setItem(draftKey(), JSON.stringify(draft));
   } catch { /* ignore */ }
+}
+
+// Clear all non-task form fields and pill selections.
+// Called when switching to a different project folder so stale data from the
+// previous project doesn't linger before restoreDraft() re-populates from the
+// new project's draft.
+function clearFormFields() {
+  document.querySelectorAll('input[id]:not([type="checkbox"]):not([type="radio"]), textarea[id]').forEach(el => {
+    if (el.id.startsWith('task-')) return;
+    el.value = '';
+  });
+  document.querySelectorAll('input[id][type="checkbox"]').forEach(el => {
+    if (el.id.startsWith('task-')) return;
+    el.checked = false;
+  });
+  document.querySelectorAll('[id^="pill-"].selected').forEach(el => {
+    el.classList.remove('selected');
+    const input = el.querySelector('input');
+    if (input) input.checked = false;
+  });
 }
 
 // Hook: attach saveDraft to all input/change events on a screen element.
@@ -1603,6 +1626,11 @@ async function grantFolder() {
     badge.textContent = '📂 ' + handle.name;
     badge.className = 'folder-badge granted';
     showToast('Project folder set: ' + handle.name + ' — analysing…', 'success');
+
+    // Clear form data from any previously loaded project, then restore this
+    // project's own draft (keyed by folder name). Prevents cross-project bleed.
+    clearFormFields();
+    restoreDraft();
 
     // Auto-set codebase_path to '..' — always correct when agent-artifacts/ is inside project root
     const pathEl = document.getElementById('cfg-codebase-path');

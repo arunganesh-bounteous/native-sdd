@@ -879,6 +879,9 @@ function buildArchitectureScreen(fp) {
     <div class="form-section">
       <h3>Architecture Pattern ${tierBadge('core')}</h3>
       <div class="form-sub">
+        <strong>Select the architecture your app currently uses</strong> — this tells the agent how to read existing code.
+        If you're migrating to a different pattern, use the <em>Target Architecture Notes</em> field below to describe where you're heading.
+        The agent will write new code to the target, and use Migration Rules to guard against expanding the legacy pattern.<br><br>
         <strong>MVVM</strong> — ViewModel + StateFlow/@Published + Repository. Recommended for SwiftUI.<br>
         <strong>MVC</strong> — ViewController as controller. Default UIKit pattern; use Migration Rules to guard new code.<br>
         <strong>VIPER</strong> — View, Interactor, Presenter, Entity, Router. Complex but fully testable.<br>

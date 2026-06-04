@@ -149,26 +149,32 @@ These hooks prevent the agent from accidentally editing spec-kit or generated fi
 
 ### Step 3 — Bootstrap context files (15–20 min per module)
 
-On day 1, `agent-artifacts/context/` only has the seed files. The agent needs a
-context file per module to work accurately without scanning from scratch each time.
+**Bootstrap is required before running tasks.** On day 1, `agent-artifacts/context/` only
+has seed files. Without bootstrapping, the agent scans the codebase from scratch on every
+task — slower, more tokens, and lower accuracy. A bootstrapped context file gives Claude a
+pre-built map of each module so it can go straight to the right files.
 
-Copy and fill in the bootstrap template already in your tasks folder:
+No manual file copying needed — `MODULE_MAP.md` already contains the module names and source
+paths the agent needs. Give Claude that file and the bootstrap template, and it does the rest.
 
-```bash
-cp agent-artifacts/tasks/BOOTSTRAP_TEMPLATE.md agent-artifacts/tasks/BOOTSTRAP-login.md
-# Fill in: module name, source path, key classes from MODULE_MAP.md
+In Claude Code, run one prompt per module:
+
 ```
-
-Then in Claude Code:
-```
-Read agent-artifacts/CLAUDE.md and execute agent-artifacts/tasks/BOOTSTRAP-login.md
+Read agent-artifacts/CLAUDE.md and agent-artifacts/spec-kit/MODULE_MAP.md and
+agent-artifacts/tasks/BOOTSTRAP_TEMPLATE.md. Bootstrap the [Module Name] module
+following BOOTSTRAP_TEMPLATE.md instructions exactly.
 ```
 
 Claude reads the source files, extracts structure, and writes
-`agent-artifacts/context/login.md`. No production code is created or modified.
+`agent-artifacts/context/<module>.md`. No production code is created or modified.
 
-**Tip:** Don't bootstrap all modules at once. Start with the 3–5 modules your
-current sprint touches. Bootstrap others as tasks arrive.
+**Evidence-only rule:** The bootstrap template instructs Claude to mark any claim it cannot
+confirm from source files as `[not confirmed — verify with team]` rather than infer it. After
+each bootstrap run, do a one-pass review of the generated context file and either confirm or
+correct those placeholders before running tasks against that module.
+
+**Tip:** Don't bootstrap all modules at once. Start with the 3–5 modules your current sprint
+touches. Bootstrap others as tasks arrive.
 
 ---
 

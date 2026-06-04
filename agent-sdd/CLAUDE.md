@@ -138,16 +138,16 @@ If anything is ambiguous, stop here (see Ambiguity Protocol below).
 **Context files loaded:** [list each agent-artifacts/context/<module>.md]
 
 **Files to create:**
-- path/to/NewFile.kt — [one-line reason]
+- path/to/NewFile.[kt|swift] — [one-line reason]
 
 **Files to modify:**
-- path/to/ExistingFile.kt — [one-line reason]
+- path/to/ExistingFile.[kt|swift] — [one-line reason]
 
 **Migration rules that apply:**
 - [RULE-ID]: [how it affects this task]
 
 **Tech debt in scope:**
-- [DEBT-ID]: [what it means for this task — e.g., "do not add LiveData here"]
+- [DEBT-ID]: [what it means for this task]
 
 **Ambiguities:** None / [list if any]
 ```
@@ -205,7 +205,12 @@ Do not mark it done. Do not work around it silently.
 
 ### 6b — Quality Gate
 
-Scan every file you created or modified against these checks:
+Read `platform` from `agent-artifacts/project.config.md`. Apply the matching defaults below.
+`agent-artifacts/spec-kit/CONVENTIONS.md` takes precedence over these defaults if it defines the same check.
+
+Scan every file you created or modified against the checks for your platform:
+
+**Android / Kotlin**
 
 | Check | Rule |
 |-------|------|
@@ -218,6 +223,21 @@ Scan every file you created or modified against these checks:
 | No business logic in UI layer | Composables, Fragments, Activities call ViewModel only |
 | ViewModel has no Android imports | No `Context`, `View`, `FragmentManager` |
 | DTOs/Entities not exposed to UI | Repository returns domain models only |
+| Tests follow TESTING.md naming | `functionName_scenario_expectedResult` |
+
+**iOS / Swift**
+
+| Check | Rule |
+|-------|------|
+| No force unwrap (`!`) | Use `guard let`, `if let`, or `??` |
+| No force cast (`as!`) | Use `as?` with a guard or safe fallback |
+| No `DispatchQueue.main.sync` | Use `await MainActor.run` or `@MainActor` annotation |
+| No hardcoded strings | All user-visible text in `Localizable.strings` or `LocalizedStringKey` |
+| No hardcoded colors or dimensions | Use `Assets.xcassets` named colors or a `DesignTokens` extension |
+| No business logic in Views | SwiftUI Views and ViewControllers call ViewModel/Presenter only |
+| ViewModel has no UIKit imports | No `UIView`, `UIViewController`, `UIApplication` in ViewModel files |
+| DTOs/Entities not exposed to UI | Repository returns domain models only |
+| No `@State` for shared state | Cross-view state uses `@StateObject` / `@ObservedObject` / `@Observable` |
 | Tests follow TESTING.md naming | `functionName_scenario_expectedResult` |
 
 For each failure found: **fix it before proceeding.** Log what you fixed under Self-Corrections.
@@ -266,16 +286,16 @@ Use this exact format:
 ## Done — [TICKET-ID]: [Title]
 
 ### Files created
-- path/to/NewFile.kt
+- path/to/NewFile.[kt|swift]
 
 ### Files modified
-- path/to/ExistingFile.kt — [one line: what changed and why]
+- path/to/ExistingFile.[kt|swift] — [one line: what changed and why]
 
 ### Context files updated
 - agent-artifacts/context/[module].md — [one line: what was added or changed]
 
 ### Tests written
-- path/to/NewFileTest.kt — [scenarios covered]
+- path/to/NewFileTest.[kt|swift] — [scenarios covered]
 
 ### Acceptance criteria
 - [x] Criterion 1 — verified: [specific evidence]
@@ -311,9 +331,14 @@ These rules have no exceptions. Do not reason around them.
 - **Never fix tech debt outside task scope.** Log it in the completion report instead.
 - **Never refactor code the task did not ask you to touch.** Diffs must be reviewable.
 
-### Code quality rules (Android/Kotlin defaults — see CONVENTIONS.md for overrides)
+### Code quality rules
+
+`agent-artifacts/spec-kit/CONVENTIONS.md` is the authoritative source. The defaults below apply
+when CONVENTIONS.md is absent or silent on a rule.
+
+**Android / Kotlin defaults**
 - No `!!` null assertions. Use `?.let {}`, `?: return`, or `requireNotNull(x) { "message" }`.
-- No hardcoded strings, colors, or dimensions. Use resource files.
+- No hardcoded strings, colors, or dimensions. Use `strings.xml`, theme attributes, `dimens.xml`.
 - No business logic in the UI layer (Composables, XML layouts, Fragments, Views, Activities).
 - Every `when` on a sealed class or sealed interface must be exhaustive. No `else` on sealed types.
 - No `GlobalScope`. All coroutines in `viewModelScope` (or `lifecycleScope` for one-shot UI ops).
@@ -321,9 +346,16 @@ These rules have no exceptions. Do not reason around them.
 - Never convert Java to Kotlin unless the task explicitly instructs it.
 - No `lateinit var` except for Hilt-injected fields.
 
-### For non-Android platforms
-The rules above are Android/Kotlin defaults. `agent-artifacts/spec-kit/CONVENTIONS.md` defines the
-equivalent rules for your platform. CONVENTIONS.md takes precedence over this list.
+**iOS / Swift defaults**
+- No force unwrap (`!`). Use `guard let`, `if let`, or `??` with a safe fallback.
+- No force cast (`as!`). Use `as?` with a guard or safe fallback.
+- No `DispatchQueue.main.sync`. Use `await MainActor.run` or `@MainActor` annotation.
+- No hardcoded strings. Use `Localizable.strings` or `LocalizedStringKey`.
+- No hardcoded colors or dimensions. Use `Assets.xcassets` named colors or a `DesignTokens` extension.
+- No business logic in Views. SwiftUI Views and ViewControllers delegate to ViewModel/Presenter only.
+- No UIKit imports in ViewModel files (`UIView`, `UIViewController`, `UIApplication`).
+- No `@State` for shared or cross-view state. Use `@StateObject`, `@ObservedObject`, or `@Observable`.
+- Never mix SwiftUI and UIKit in the same screen unless the task explicitly requires it.
 
 ---
 

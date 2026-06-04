@@ -161,7 +161,10 @@ with existing call sites. Do not refactor to constructor injection in this task.
 ## After Claude Finishes
 
 1. Review the completion report — check each criterion is ticked or has a reason.
-2. Review context file changes alongside code changes in the same PR.
+2. Review context file changes alongside code changes in the same PR. Look for:
+   - New entries in the Key Files table — confirm the file paths are real and accurate
+   - State Management or Known Patterns sections — check they reflect the actual code, not assumptions
+   - Any `[not confirmed — verify with team]` placeholders (these appear after bootstrap runs, but can also appear in task updates if Claude couldn't confirm something from source) — replace them with the correct information or remove if not applicable
 3. Review "Follow-up recommended" — add any new debt entries to `spec-kit/TECH_DEBT.md` if warranted.
 4. Delete the task MD after the PR merges, or keep it as a log — your team's choice.
 
