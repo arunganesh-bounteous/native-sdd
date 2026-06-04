@@ -1,6 +1,6 @@
 # Agentic SDD Skeleton
 
-A project-agnostic scaffold that enables Claude (or any capable AI agent) to
+A project scaffold that enables Claude (or any capable AI agent) to
 autonomously execute development tasks — features, bugs, refactors — on any
 mobile or backend project with consistent quality and minimal token overhead.
 
