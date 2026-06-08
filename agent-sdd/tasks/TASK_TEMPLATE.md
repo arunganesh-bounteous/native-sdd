@@ -1,10 +1,10 @@
 # Task: [TICKET-ID] — [Title]
 # ─────────────────────────────────────────────────────────────────────────────
 # HOW TO USE:
-# 1. Copy this file: cp tasks/TASK_TEMPLATE.md tasks/[PROJ]-1234.md
+# 1. Rename this file: PROJ-1234.md
 # 2. Fill in every section below (remove comments as you go)
-# 3. Open Claude Code, point it at this SDD folder, and say:
-#    "Read CLAUDE.md and execute tasks/[PROJ]-1234.md"
+# 3. From your project terminal run:
+#    claude "Read agent-artifacts/CLAUDE.md and execute agent-artifacts/tasks/PROJ-1234.md"
 # ─────────────────────────────────────────────────────────────────────────────
 
 ## Type

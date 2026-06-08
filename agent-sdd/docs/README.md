@@ -67,7 +67,6 @@ wizard-core.js (1500+ lines)
 ├── File I/O (tryReadFile, handleSave)
 ├── Form utilities (selectPill, pill rendering)
 ├── Existing output detection (detectExistingOutputFiles)
-├── Companion polling (pollCompanion, setCompanionStatus)
 ├── Folder selection (grantFolder, showFolderInterstitial)
 └── Utilities (showToast, updatePreview)
 

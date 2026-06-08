@@ -36,12 +36,15 @@ generates into an `agent-artifacts/` folder inside the project you point it at.
 anywhere/
 └── agent-sdd/                      ← this tool — lives standalone, never inside a project
     ├── setup-wizard.html           ← open this to set up any project
-    ├── CLAUDE.md                   ← source of truth for agent instructions
-    ├── engine/                     ← wizard internals — never edit
-    │   ├── wizard-core.js
+    ├── VERSION                     ← skeleton version — bump to trigger update banner
+    ├── CLAUDE.md                   ← SOURCE of truth — agent protocol (edit here)
+    ├── hooks/                      ← SOURCE of truth — hook settings + scripts (edit here)
+    ├── tasks/, context/            ← SOURCE of truth — task & context templates
+    ├── engine/                     ← wizard internals — never edit by hand
+    │   ├── wizard-core.js          ← wizard engine + EMBEDDED_* copies (generated)
+    │   ├── generate-embedded.js    ← maintainer-only: source files → embedded copies
     │   ├── platform-android.js
     │   └── platform-ios.js
-    ├── companion.js                ← optional Node.js bridge for running claude CLI from the wizard
     └── tutorial*.html              ← SDD workflow guides
 
 
@@ -204,7 +207,7 @@ writes the code, updates the context file, and produces a completion report.
 | **spec-kit/** (heart) | Rules, standards, architecture | Tech lead | Rarely — when decisions change |
 | **context/** (memory) | Module knowledge, file maps, state shapes | Agent | Every task that touches the module |
 | **tasks/** | Ticket specifications | Developer | Per ticket |
-| **agent-sdd/** | The tool — wizard, templates, CLAUDE.md | Standalone tool | When you pull a new version |
+| **agent-sdd/** | The tool — wizard + engine. Source files (CLAUDE.md, hooks) are embedded into wizard-core.js by `generate-embedded.js` | Standalone tool | When you pull a new version |
 
 **spec-kit** tells the agent *how to work*. **context** tells it *what the
 codebase looks like*. Both are needed for accurate, in-scope output.
@@ -232,7 +235,23 @@ Keep spec-kit files concise (1–3 pages each) and context files tight (under
 - **Architecture decision changed** — update `ARCHITECTURE.md` and add an ADR with the reason.
 - **Debt resolved** — move the entry in `TECH_DEBT.md` to the Resolved section.
 - **Conventions updated** — update `CONVENTIONS.md` and add a dated note at the top of the changed section.
-- **Skeleton update available** — pull the latest version of `agent-sdd`, then re-run the setup wizard and save the final step to refresh `agent-artifacts/CLAUDE.md`. Your spec-kit and context data are unaffected.
+- **Skeleton update available** — when you open the wizard against a project that was set up with an older skeleton, it shows an amber **"Update available"** banner (it compares the version in `agent-artifacts/.sdd-version` against the bundled `VERSION`). Pull the latest `agent-sdd`, re-run the wizard, and save the final step to refresh `agent-artifacts/CLAUDE.md`, the hooks, and the version manifest. Your spec-kit and context data are unaffected.
+
+### Maintaining the embedded content (maintainers only)
+
+`CLAUDE.md`, the task/context templates, and `hooks/**` are the **clean source of truth** — edit them directly. The wizard ships their contents as `EMBEDDED_*` constants inside `engine/wizard-core.js` so the browser can write them into a project without filesystem access to the tool. Keep the two in sync with the forward generator:
+
+```bash
+# 1. Edit the source file(s): CLAUDE.md, hooks/scripts/*.sh, tasks/*, context/*
+# 2. Bump the version if existing projects should see the update banner:
+echo "1.2" > agent-sdd/VERSION
+# 3. Regenerate the embedded constants + SKELETON_VERSION:
+node agent-sdd/engine/generate-embedded.js
+# 4. Sanity-check and commit:
+node --check agent-sdd/engine/wizard-core.js
+```
+
+`generate-embedded.js` is a maintainer-only build step — it is **never** run by end users, adds no Node dependency to their project, and the wizard only reads the already-embedded constants. Never hand-edit the `EMBEDDED_*` strings in `wizard-core.js`; they are overwritten on every regen.
 
 ---
 
@@ -242,31 +261,6 @@ Keep spec-kit files concise (1–3 pages each) and context files tight (under
 |----------|--------------|-------------------|
 | Android | `engine/platform-android.js` | Gradle scan — Kotlin / Java |
 | iOS | `engine/platform-ios.js` | Source scan — Swift / Objective-C / Mixed |
-
----
-
-## Companion Script (Run Claude from the Wizard)
-
-`companion.js` is an optional local bridge that lets the wizard launch the Claude Code CLI
-directly from the **▶ Run with Claude** button on the Task screen — no copy-pasting needed.
-
-**Requirements:** Node.js 18+ and the `claude` CLI on your PATH (`npm i -g @anthropic-ai/claude-code`).
-
-```bash
-# From the agent-sdd/ folder (the standalone tool):
-node companion.js
-```
-
-Keep it running while you use the wizard. The wizard polls for it automatically and shows a
-green **● Companion** indicator in the header when it's connected.
-
-When you click **▶ Run with Claude**, the wizard:
-1. Auto-saves the task file to `agent-artifacts/tasks/<TICKET-ID>.md`
-2. Sends `claude --print --dangerously-skip-permissions "Read agent-artifacts/CLAUDE.md and execute <path>"` to the companion
-3. Streams the output into a terminal panel inline
-
-The companion server listens on `http://localhost:127.0.0.1:7842` and accepts CORS requests
-from the local `file://` page. No npm dependencies — pure Node built-ins only.
 
 ---
 

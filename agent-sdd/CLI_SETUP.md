@@ -147,7 +147,7 @@ claude "Read agent-artifacts/CLAUDE.md and execute agent-artifacts/tasks/PROJ-12
 
 | Issue | Solution |
 |-------|----------|
-| "agent-sdd/CLAUDE.md not found" | Run from project root where agent-sdd/ is located |
+| "agent-artifacts/CLAUDE.md not found" | Run the setup wizard first — it generates `agent-artifacts/CLAUDE.md`. Then run the command from your project root. |
 | "agent-artifacts/ not created" | Check Claude output for errors; may need to create manually and retry |
 | "Platform detection wrong" | Edit `agent-artifacts/project.config.md` and correct the values |
 | "MODULE_MAP.md missing modules" | Add them manually to MODULE_MAP.md, then bootstrap their context |

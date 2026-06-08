@@ -1,6 +1,14 @@
 {
   "permissions": {
     "deny": [
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)",
+      "Bash(git merge:*)",
+      "Bash(git rebase:*)",
+      "Bash(git tag:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean:*)",
       "Write(agent-sdd/**)",
       "Edit(agent-sdd/**)",
       "Write(agent-artifacts/CLAUDE.md)",
@@ -33,6 +41,15 @@
           {
             "type": "command",
             "command": "bash .claude/scripts/protected-paths.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/scripts/git-guard.sh"
           }
         ]
       }
