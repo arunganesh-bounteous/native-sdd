@@ -32,6 +32,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');           // agent-sdd/
 const WIZARD = path.join(ROOT, 'engine', 'wizard-core.js');
+const WIZARD_HTML = path.join(ROOT, 'setup-wizard.html');
 const VERSION_FILE = path.join(ROOT, 'VERSION');
 const CHANGELOG_FILE = path.join(ROOT, 'CHANGELOG.md');
 
@@ -170,6 +171,45 @@ function main() {
 
   fs.writeFileSync(WIZARD, js);
   console.log(`\nSKELETON_VERSION = ${version}`);
+
+  // ── Inline wizard-core.js into setup-wizard.html ────────────────────────────
+  //  Opening a `file://` HTML that loads a sibling JS via <script src> is blocked
+  //  by Chrome's security sandbox (ERR_ACCESS_DENIED). Fix: replace the external
+  //  <script src="engine/wizard-core.js"> with an inline <script> block so the
+  //  HTML is a self-contained, single-file artifact — no server needed.
+  //
+  //  Source files (wizard-core.js, setup-wizard.html) stay separate for editing;
+  //  this step merges them at generate time. setup-wizard.html is the deliverable.
+  // ────────────────────────────────────────────────────────────────────────────
+  const SCRIPT_TAG_RE = /<script\s+src=["']engine\/wizard-core\.js["']\s*><\/script>/;
+  let html = fs.readFileSync(WIZARD_HTML, 'utf8');
+
+  if (!SCRIPT_TAG_RE.test(html)) {
+    // Already inlined by a previous run — the <script src> has been replaced.
+    // Re-inline by extracting between the sentinel comments or just replace the
+    // block. For simplicity we re-read the final js and replace any existing
+    // inline block delimited by our markers.
+    const BEGIN = '<!-- wizard-core:inline -->';
+    const END   = '<!-- /wizard-core:inline -->';
+    const bi = html.indexOf(BEGIN);
+    const ei = html.indexOf(END);
+    if (bi >= 0 && ei >= 0) {
+      html = html.slice(0, bi) +
+             BEGIN + `\n<script>\n${js}\n</script>\n` +
+             END +
+             html.slice(ei + END.length);
+    } else {
+      console.warn('WARNING: could not locate wizard-core.js script tag or inline markers in setup-wizard.html — skipping HTML inline step.');
+    }
+  } else {
+    html = html.replace(
+      SCRIPT_TAG_RE,
+      `<!-- wizard-core:inline -->\n<script>\n${js}\n</script>\n<!-- /wizard-core:inline -->`
+    );
+  }
+
+  fs.writeFileSync(WIZARD_HTML, html);
+  console.log('inlined wizard-core.js → setup-wizard.html (standalone, file:// safe)');
   console.log('DONE — wizard-core.js regenerated. Run `node --check` and commit.');
 }
 
