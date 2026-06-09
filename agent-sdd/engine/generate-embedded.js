@@ -38,6 +38,8 @@ const CHANGELOG_FILE = path.join(ROOT, 'CHANGELOG.md');
 
 // const name  →  source file (relative to agent-sdd/)
 const MAP = {
+  EMBEDDED_PLATFORM_ANDROID:   'engine/platform-android.js',
+  EMBEDDED_PLATFORM_IOS:       'engine/platform-ios.js',
   EMBEDDED_CLAUDE_MD:          'CLAUDE.md',
   EMBEDDED_TASK_TEMPLATE:      'tasks/TASK_TEMPLATE.md',
   EMBEDDED_BOOTSTRAP_TEMPLATE: 'tasks/BOOTSTRAP_TEMPLATE.md',
