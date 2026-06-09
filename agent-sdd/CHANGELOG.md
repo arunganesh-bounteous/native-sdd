@@ -9,6 +9,11 @@ headings — the "Unreleased" section below is ignored until you promote it to a
 
 ## Unreleased (next version)
 
+- Plug-n-play skills: optional per-ticket instruction modules in `agent-artifacts/skills/`,
+  activated via a `Skills:` line in the task file. Ships `ada` (accessibility/a11y compliance)
+  and `analytics` (event instrumentation). Off by default; a skill only adds requirements,
+  never relaxes the base quality gate or a Hard Rule.
+
 ## 1.2 — 2026-06-08
 - Context freshness check: the agent verifies a context file's Key Files still exist
   before trusting it, and re-derives from source if any are missing.

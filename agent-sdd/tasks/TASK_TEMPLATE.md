@@ -14,6 +14,18 @@
 - [ ] Refactor
 - [ ] Task
 
+## Skills
+
+<!--
+Plug-n-play skill modules to activate for THIS ticket. Off by default.
+Available skills (see agent-artifacts/skills/_index.md):
+  - ada       → accessibility (a11y) compliance for UI you touch
+  - analytics → analytics event instrumentation for user actions / screen views
+List the ones this ticket needs, or "none".
+-->
+
+Skills: none
+
 ## Description
 
 <!--

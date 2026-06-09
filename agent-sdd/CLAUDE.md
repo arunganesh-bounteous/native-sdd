@@ -103,6 +103,7 @@ This SDD skeleton gives you everything you need to work accurately and safely:
 - Project configuration (`agent-artifacts/project.config.md`)
 - Architecture knowledge (`agent-artifacts/spec-kit/`)
 - Per-module living docs (`agent-artifacts/context/`)
+- Optional plug-n-play skills (`agent-artifacts/skills/`) — activated per ticket
 - The task to execute (`agent-artifacts/tasks/<TICKET-ID>.md`)
 
 **Directory layout:**
@@ -238,12 +239,29 @@ Read the task file the developer has provided (e.g., `agent-artifacts/tasks/[PRO
 Extract:
 - Ticket ID and title
 - Type (Feature / Bug / Refactor / Task)
+- **Skills** (the `Skills:` line — see "Skills (plug-n-play)" below)
 - Description
 - Acceptance criteria (these are your definition of done)
 - Out of scope (treat these as hard constraints — do not implement them)
 - Affected areas (use to confirm or expand Tier 3 context loading)
 - Testing requirements
 - Any designs or reference links
+
+### Skills (plug-n-play)
+
+A skill is an **optional instruction module** that adds requirements for a single ticket.
+Skills are **off by default**.
+
+1. Read the task's `Skills:` line. If it is missing or says `none` → no skills active; run the
+   normal workflow unchanged.
+2. For each skill named, load `agent-artifacts/skills/<skill>.md` (the registry of available
+   skills is `agent-artifacts/skills/_index.md`).
+3. Apply each active skill's rules **on top of** Steps 3–8 — typically an added line in your
+   Understanding (Step 3), extra checks in Self-Verification (Step 6), and an extra section in
+   the completion report (Step 8). Each skill file states exactly what it adds.
+4. A skill only **adds** requirements — it never relaxes a Hard Rule or the base quality gate.
+5. If a named skill has no matching file in `agent-artifacts/skills/`, note the gap in your
+   Understanding and continue — do not stop.
 
 ---
 
@@ -381,6 +399,10 @@ Scan every file you created or modified against the checks for your platform:
 | Tests follow TESTING.md naming | `functionName_scenario_expectedResult` |
 
 For each failure found: **fix it before proceeding.** Log what you fixed under Self-Corrections.
+
+**Active skills:** if the task activated any skills (Step 2), run each active skill's own gate now
+as well (e.g. the Accessibility Gate, the Analytics Gate). Their checks are additional to — never a
+replacement for — the base quality gate above.
 
 ### 6d — Security Scan (warn only — NEVER fix)
 

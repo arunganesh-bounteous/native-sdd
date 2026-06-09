@@ -122,6 +122,7 @@ This SDD skeleton gives you everything you need to work accurately and safely:
 - Project configuration (\`agent-artifacts/project.config.md\`)
 - Architecture knowledge (\`agent-artifacts/spec-kit/\`)
 - Per-module living docs (\`agent-artifacts/context/\`)
+- Optional plug-n-play skills (\`agent-artifacts/skills/\`) — activated per ticket
 - The task to execute (\`agent-artifacts/tasks/<TICKET-ID>.md\`)
 
 **Directory layout:**
@@ -257,12 +258,29 @@ Read the task file the developer has provided (e.g., \`agent-artifacts/tasks/[PR
 Extract:
 - Ticket ID and title
 - Type (Feature / Bug / Refactor / Task)
+- **Skills** (the \`Skills:\` line — see "Skills (plug-n-play)" below)
 - Description
 - Acceptance criteria (these are your definition of done)
 - Out of scope (treat these as hard constraints — do not implement them)
 - Affected areas (use to confirm or expand Tier 3 context loading)
 - Testing requirements
 - Any designs or reference links
+
+### Skills (plug-n-play)
+
+A skill is an **optional instruction module** that adds requirements for a single ticket.
+Skills are **off by default**.
+
+1. Read the task's \`Skills:\` line. If it is missing or says \`none\` → no skills active; run the
+   normal workflow unchanged.
+2. For each skill named, load \`agent-artifacts/skills/<skill>.md\` (the registry of available
+   skills is \`agent-artifacts/skills/_index.md\`).
+3. Apply each active skill's rules **on top of** Steps 3–8 — typically an added line in your
+   Understanding (Step 3), extra checks in Self-Verification (Step 6), and an extra section in
+   the completion report (Step 8). Each skill file states exactly what it adds.
+4. A skill only **adds** requirements — it never relaxes a Hard Rule or the base quality gate.
+5. If a named skill has no matching file in \`agent-artifacts/skills/\`, note the gap in your
+   Understanding and continue — do not stop.
 
 ---
 
@@ -400,6 +418,10 @@ Scan every file you created or modified against the checks for your platform:
 | Tests follow TESTING.md naming | \`functionName_scenario_expectedResult\` |
 
 For each failure found: **fix it before proceeding.** Log what you fixed under Self-Corrections.
+
+**Active skills:** if the task activated any skills (Step 2), run each active skill's own gate now
+as well (e.g. the Accessibility Gate, the Analytics Gate). Their checks are additional to — never a
+replacement for — the base quality gate above.
 
 ### 6d — Security Scan (warn only — NEVER fix)
 
@@ -607,6 +629,18 @@ const EMBEDDED_TASK_TEMPLATE = `# Task: [TICKET-ID] — [Title]
 - [ ] Bug
 - [ ] Refactor
 - [ ] Task
+
+## Skills
+
+<!--
+Plug-n-play skill modules to activate for THIS ticket. Off by default.
+Available skills (see agent-artifacts/skills/_index.md):
+  - ada       → accessibility (a11y) compliance for UI you touch
+  - analytics → analytics event instrumentation for user actions / screen views
+List the ones this ticket needs, or "none".
+-->
+
+Skills: none
 
 ## Description
 
@@ -996,6 +1030,174 @@ For tasks touching >1 module: load ALL matching context files, then proceed.
 - \`_index.md\` (this file) — agent routing table: keyword → context file
 - \`MODULE_MAP.md\` — module registry: path, pattern, DI, key classes, debt anchor
 - Keep both in sync when adding a new module.
+`;
+
+// ── Embedded: skills/ (plug-n-play skill modules) ─────
+// Populated by engine/generate-embedded.js from skills/*.md.
+const EMBEDDED_SKILLS_INDEX = `# Skills Index
+# ─────────────────────────────────────────────────────────────────────────────
+# Plug-n-play skill modules. A skill is OFF by default and turns ON only when a
+# task's \`Skills:\` line names it. The agent reads this index to know which skills
+# exist and where to load each one from.
+# ─────────────────────────────────────────────────────────────────────────────
+
+## Available Skills
+
+| Skill | File | What it enforces when active |
+|-------|------|------------------------------|
+| \`ada\` | \`skills/ada.md\` | Accessibility (a11y) compliance for UI the task touches — labels, touch targets, text scaling, color-independent signals. |
+| \`analytics\` | \`skills/analytics.md\` | Analytics event instrumentation for in-scope user actions / screen views, through the project's existing analytics mechanism, no PII. |
+
+## How a developer turns a skill on
+
+Add the skill name to the task file's \`Skills:\` line:
+
+\`\`\`
+## Skills
+
+Skills: ada, analytics
+\`\`\`
+
+\`Skills: none\` (or omitting the line) = no skills active; the agent runs the normal workflow.
+
+## How the agent uses this (summary — full rules in CLAUDE.md Step 2)
+
+1. Read the task's \`Skills:\` line.
+2. For each named skill, load \`agent-artifacts/skills/<skill>.md\`.
+3. Apply each active skill's rules on top of Steps 3–8. A skill never relaxes a
+   Hard Rule or the base quality gate — it only adds requirements.
+4. If a named skill has no matching file, note the gap and continue — do not stop.
+
+<!-- Add a row here whenever you add a new skill module to skills/. -->
+`;
+const EMBEDDED_SKILL_ADA = `# Skill: ada — Accessibility (a11y) Compliance
+# ─────────────────────────────────────────────────────────────────────────────
+# A plug-n-play skill module. It is ACTIVE only when a task's \`Skills:\` line lists
+# \`ada\`. When active, apply the rules below ON TOP OF the normal Steps 0–8.
+# Scope is limited to UI the task creates or modifies — do not retrofit the
+# whole app. Read-only for the agent; humans edit this in agent-sdd/skills/.
+# ─────────────────────────────────────────────────────────────────────────────
+
+## When this skill is active
+
+The ticket touches user-facing UI and must meet accessibility standards. Apply these
+checks to every screen, view, or component you **create or modify** — not to code you
+only read.
+
+If the project's \`spec-kit/CONVENTIONS.md\` defines accessibility rules, those take
+precedence over the defaults here.
+
+## What it adds to your workflow
+
+- **Step 3 (Understanding):** add a line \`**Accessibility (ada):** active — <screens/views in scope>\`.
+- **Step 5 (Execute):** build accessibility in as you write the UI — do not bolt it on after.
+- **Step 6 (Self-Verification):** run the Accessibility Gate below in addition to the normal quality gate.
+- **Step 8 (Completion report):** add an \`### Accessibility (ada)\` section listing what you verified and what needs manual review.
+
+## Accessibility Gate
+
+Scan every UI file you created or modified.
+
+**Android**
+
+| Check | Rule |
+|-------|------|
+| Content labels | Every actionable / informative view has a \`contentDescription\` (or \`contentDescription = null\` for purely decorative images). Compose: \`Modifier.semantics\` / \`contentDescription\`. |
+| Touch targets | Interactive targets are at least \`48dp × 48dp\` (\`minWidth\`/\`minHeight\` or \`Modifier.sizeIn\`). |
+| Text scaling | Text sizes use \`sp\`, not \`dp\`; layouts do not hard-code heights that clip scaled text. |
+| Color is not the only signal | State/meaning conveyed by color also has text, icon, or shape. |
+| Focus & order | Screen-reader (TalkBack) focus order is logical; related controls grouped. |
+| Labels not redundant | No "button"/"image" baked into the label — the role announces that. |
+
+**iOS**
+
+| Check | Rule |
+|-------|------|
+| Labels | Every control has a meaningful \`accessibilityLabel\`; decorative images are hidden via \`accessibilityHidden(true)\`. |
+| Dynamic Type | Text uses scalable styles (\`.font(.body)\` / \`UIFontMetrics\`), not fixed point sizes. |
+| Touch targets | Tappable targets are at least \`44pt × 44pt\`. |
+| Color is not the only signal | Meaning conveyed by color also has text/icon/shape. |
+| Traits | Controls expose correct \`accessibilityTraits\` (\`.button\`, \`.header\`, etc.). |
+| VoiceOver order | Reading order is logical; related elements grouped with \`accessibilityElement(children:)\`. |
+
+## Evidence & honesty rule
+
+- Report each view you labeled and how (file:line).
+- **Color contrast** usually cannot be measured from source alone. Do NOT claim a contrast
+  pass you did not verify — list color/background pairs you introduced as
+  \`manual review needed — verify ≥ 4.5:1 (3:1 for large text)\`.
+- Anything you cannot confirm from code → flag for manual review rather than asserting pass.
+
+## Completion report section
+
+\`\`\`
+### Accessibility (ada)
+- Labeled: [file:line — view → label]
+- Touch targets verified: [file:line]
+- Text scaling: [pass / issue]
+- Manual review needed: [contrast pairs, anything not verifiable from source]
+\`\`\`
+`;
+const EMBEDDED_SKILL_ANALYTICS = `# Skill: analytics — Event Instrumentation
+# ─────────────────────────────────────────────────────────────────────────────
+# A plug-n-play skill module. It is ACTIVE only when a task's \`Skills:\` line lists
+# \`analytics\`. When active, apply the rules below ON TOP OF the normal Steps 0–8.
+# Scope is limited to user actions / screen views in UI the task creates or
+# modifies. Read-only for the agent; humans edit this in agent-sdd/skills/.
+# ─────────────────────────────────────────────────────────────────────────────
+
+## When this skill is active
+
+The ticket requires user behaviour to be instrumented with analytics/tracking events.
+Add events for the user actions and screen views in scope — nothing more.
+
+## Use the project's existing analytics, never invent one
+
+Before adding any event:
+1. Find how the project already sends analytics — search the loaded context files and
+   source for the existing analytics manager / wrapper / SDK call (e.g. an
+   \`AnalyticsManager\`, \`Tracker\`, \`logEvent(...)\`, Firebase \`FirebaseAnalytics\`).
+2. **Route every new event through that existing mechanism.** Do NOT add a new SDK,
+   a new wrapper, or direct SDK calls scattered in the UI.
+3. If you cannot find an existing analytics mechanism, do NOT guess one — STOP and ask
+   the developer which to use (Ambiguity Protocol).
+
+If \`spec-kit/CONVENTIONS.md\` or \`spec-kit/DATA_MODEL.md\` defines an event naming
+convention or schema, follow it exactly. Otherwise default to \`snake_case\` event names.
+
+## What it adds to your workflow
+
+- **Step 3 (Understanding):** add \`**Analytics (analytics):** active — <actions/screens to instrument>\` and name the existing analytics mechanism you will use.
+- **Step 5 (Execute):** fire events from the correct layer (prefer ViewModel/Presenter over View, matching the project's pattern), through the existing analytics wrapper.
+- **Step 6 (Self-Verification):** run the Analytics Gate below.
+- **Step 8 (Completion report):** add an \`### Analytics (analytics)\` section listing every event.
+
+## Analytics Gate
+
+| Check | Rule |
+|-------|------|
+| Existing mechanism | Events go through the project's existing analytics wrapper — no new SDK or ad-hoc calls. |
+| Naming | Event + property names follow the project convention (or \`snake_case\` default); consistent tense/voice. |
+| Coverage | Every in-scope user action and screen view has an event — no silent gaps. |
+| No PII | No emails, names, phone numbers, tokens, precise location, or free-text user input in event params. Use stable IDs only. |
+| Layer | Events fire from the layer the project uses (typically ViewModel/Presenter), not buried in UI callbacks unless that is the established pattern. |
+| No duplicates | The same action does not fire the same event from two places. |
+
+## Evidence & honesty rule
+
+- List every event with its name, properties, and the exact trigger location (file:line).
+- If a property value's source is unclear or could contain PII, flag it rather than shipping it.
+- Do not claim an event "fires correctly" without pointing to where it is dispatched.
+
+## Completion report section
+
+\`\`\`
+### Analytics (analytics)
+- Mechanism used: [AnalyticsManager / Firebase / ... — file]
+- Events added:
+  - \`event_name\` — props: [key: type] — fired at [file:line] when [trigger]
+- PII check: [pass — no PII in params / flagged: ...]
+\`\`\`
 `;
 
 // ── Embedded: hooks/settings.json ─────────────────────
@@ -2072,6 +2274,9 @@ async function writeBaseArtifacts(silent = false) {
     ['tasks/BOOTSTRAP_TEMPLATE.md',        EMBEDDED_BOOTSTRAP_TEMPLATE],
     ['context/TEMPLATE.md',                EMBEDDED_CONTEXT_TEMPLATE],
     ['context/_index.md',                  EMBEDDED_CONTEXT_INDEX],
+    ['skills/_index.md',                   EMBEDDED_SKILLS_INDEX],
+    ['skills/ada.md',                      EMBEDDED_SKILL_ADA],
+    ['skills/analytics.md',                EMBEDDED_SKILL_ANALYTICS],
     ['hooks/settings.json',                EMBEDDED_HOOKS_SETTINGS],
     ['hooks/scripts/protected-paths.sh',   EMBEDDED_PROTECTED_PATHS_SH],
     ['hooks/scripts/git-guard.sh',         EMBEDDED_GIT_GUARD_SH],
