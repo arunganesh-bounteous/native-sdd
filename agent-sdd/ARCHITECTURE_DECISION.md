@@ -4,6 +4,24 @@
 **Status:** ✅ Implemented  
 **Decision:** Copy CLAUDE.md to agent-artifacts/ during wizard setup
 
+> **Update (single source of truth):** The wizard no longer reads a standalone
+> `agent-sdd/CLAUDE.md` file at setup time. Instead, the clean source files
+> (`agent-sdd/CLAUDE.md`, `hooks/**`, task/context templates) are the **editable
+> source of truth**, and a maintainer-only build step,
+> `agent-sdd/engine/generate-embedded.js`, embeds their contents into
+> `agent-sdd/engine/wizard-core.js` as `EMBEDDED_*` template-literal constants
+> (`EMBEDDED_CLAUDE_MD`, `EMBEDDED_GIT_GUARD_SH`, etc.). The wizard writes these
+> embedded strings directly to `agent-artifacts/`. This forward-generation model
+> keeps one source of truth (edit the file, run the generator) with no drift and
+> no Node dependency on the end-user side. Everything below about *why* the
+> snapshot lives in `agent-artifacts/` still holds — only the mechanism changed
+> from "copy a file" to "write an embedded string."
+>
+> **Versioning:** `agent-sdd/VERSION` is stamped into the CLAUDE.md snapshot and
+> emitted as `SKELETON_VERSION`. The wizard writes `agent-artifacts/.sdd-version`
+> at setup and, on a later run, compares it to `SKELETON_VERSION` to show an
+> "update available" banner when a project is on an older snapshot.
+
 ---
 
 ## Problem Statement

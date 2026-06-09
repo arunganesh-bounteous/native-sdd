@@ -217,6 +217,23 @@ function parseDataModelMD(text) {
   return { entities, endpoints };
 }
 
+// ── Parse context/_index.md routing table → { moduleName(lowercased): keywords } ──
+// Keywords are the single source of truth in _index.md (not MODULE_MAP). When
+// reloading a project we backfill them onto the module rows so re-saving the
+// wizard regenerates _index.md correctly instead of wiping the routing table.
+function parseIndexKeywords(text) {
+  const map = {};
+  for (const line of text.split('\n')) {
+    const m = line.match(/^\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|/);
+    if (!m) continue;
+    const keywords = m[1].trim();
+    const name     = m[2].trim();
+    if (!name || /^-+$/.test(name) || name.toLowerCase() === 'module') continue; // header/separator
+    map[name.toLowerCase()] = keywords;
+  }
+  return map;
+}
+
 // ── Parse existing MODULE_MAP.md → module row objects ────
 function parseModuleMapMD(text) {
   const modules = [];
@@ -585,6 +602,16 @@ async function analyzeProject() {
   // ── Step 13: Modules list — prefer existing MODULE_MAP.md ──
   const existingModuleMap = await tryReadFile(state.dirHandle, 'agent-artifacts', 'spec-kit', 'MODULE_MAP.md');
   const parsedModules = existingModuleMap ? parseModuleMapMD(existingModuleMap) : [];
+
+  // Keywords live only in _index.md — backfill them onto the parsed modules so
+  // re-saving regenerates the routing table instead of emptying it.
+  if (parsedModules.length > 0) {
+    const idxText = await tryReadFile(state.dirHandle, 'agent-artifacts', 'context', '_index.md');
+    if (idxText) {
+      const kw = parseIndexKeywords(idxText);
+      parsedModules.forEach(m => { const hit = kw[m.name.trim().toLowerCase()]; if (hit) m.keywords = hit; });
+    }
+  }
 
   if (parsedModules.length > 0) {
     const list = document.getElementById('modules-list');
@@ -2156,7 +2183,6 @@ function generateModulesMD() {
     const lang       = row.querySelector('.mod-lang')?.value             || 'Swift';
     const pattern    = row.querySelector('.mod-pattern')?.value          || 'MVVM';
     const di         = row.querySelector('.mod-di')?.value               || 'Manual';
-    const keywords   = row.querySelector('.mod-keywords')?.value.trim()  || '[add keywords]';
     const purpose    = row.querySelector('.mod-purpose')?.value.trim()   || '[describe purpose]';
     const keyClasses = row.querySelector('.mod-keyclasses')?.value.trim()|| '[fill in]';
     const depends    = row.querySelector('.mod-depends')?.value.trim()   || '[fill in]';
@@ -2170,7 +2196,6 @@ function generateModulesMD() {
 | Pattern | ${pattern} |
 | DI | ${di} |
 | Purpose | ${purpose} |
-| Keywords | ${keywords} |
 | Key classes | ${keyClasses} |
 | Depends on | ${depends} |
 | Context file | \`${contextFile}\` |
@@ -2185,8 +2210,9 @@ function generateModulesMD() {
 # Agent reads this file but never modifies it.
 # ─────────────────────────────────────────────────────────────────────────────
 
-> Agent: before reading any source file, match the task keywords against the
-> Keywords field below. Load the listed context file for every matching module.
+> Agent: route via \`context/_index.md\` (keyword → context-file table) to decide which
+> modules a task touches. Then come here for each module's \`Path\`, \`Key classes\`, and
+> \`Known debt\` anchor. Never skip the routing step.
 
 ## How the Agent Uses This File
 
@@ -2195,6 +2221,9 @@ function generateModulesMD() {
 3. After completing a task on a new module: generate \`context/<module>.md\` via \`context/TEMPLATE.md\`.
 
 **Routing lives in \`context/_index.md\`, not here.**
+Keywords are intentionally NOT duplicated in this file — they live only in
+\`context/_index.md\` to avoid drift. This file is the registry (paths, key classes,
+debt anchors); \`_index.md\` is the router (keyword → context file).
 
 ---
 
@@ -2202,7 +2231,9 @@ function generateModulesMD() {
 
 ${moduleBlocks || '_No modules added yet._'}
 
-<!-- Add one entry per module using the format above. -->
+<!-- Add one entry per module using the format above.
+     Keywords live only in context/_index.md — add a routing row there for the
+     agent. Do not add a Keywords field here (single source of truth = _index.md). -->
 `;
 }
 

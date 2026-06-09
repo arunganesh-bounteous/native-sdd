@@ -111,8 +111,9 @@
   .md-rendered .md-spacer { height: 6px; }
   .md-rendered .md-hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
   .md-rendered .md-comment { font-size: 10px; color: var(--text-muted); font-family: var(--mono); margin: 2px 0; }
-  .md-rendered .md-list { margin: 4px 0 4px 16px; padding: 0; }
-  .md-rendered .md-list li { margin: 3px 0; }
+  .md-rendered ul.md-list { margin: 4px 0 4px 18px; padding: 0; list-style: disc; }
+  .md-rendered ol.md-olist { margin: 4px 0 4px 20px; padding: 0; list-style: decimal; }
+  .md-rendered .md-list li { margin: 3px 0; padding-left: 2px; }
   .md-rendered .md-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 11px; }
   .md-rendered .md-table th { background: var(--surface2); color: var(--text); padding: 5px 8px; text-align: left; border: 1px solid var(--border); font-weight: 600; }
   .md-rendered .md-table td { padding: 4px 8px; border: 1px solid var(--border); color: var(--text-dim); vertical-align: top; }
@@ -587,7 +588,7 @@
   <nav class="sidebar">
     <div class="sidebar-header">
       <h1>SDD Wizard</h1>
-      <p style="font-size:10px;color:var(--text-muted);margin-top:4px;">Agentic project setup</p>
+      <p style="font-size:10px;color:var(--text-muted);margin-top:4px;">Agentic project setup <span id="sddVersionLabel" style="opacity:0.8"></span></p>
       <p style="font-size:10px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;margin-top:6px;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Bounteous</p>
     </div>
     <div class="sidebar-steps" id="sidebarSteps">

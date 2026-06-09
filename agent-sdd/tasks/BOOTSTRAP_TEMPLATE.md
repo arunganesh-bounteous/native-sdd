@@ -91,7 +91,7 @@ Fill in before running:
 ```
 Module name:    [e.g., :app/profile]
 Source path:    [e.g., app/src/main/java/com/example/views/profile/]
-Key classes:    [list from MODULE_MAP.md — e.g., [Feature]ViewModel.kt, [Feature]Fragment.kt]
+Key classes:    [list from MODULE_MAP.md — e.g., ProfileViewModel.kt, ProfileFragment.kt]
 Context file:   [e.g., context/profile.md]
 ```
 
@@ -105,7 +105,7 @@ Context file:   [e.g., context/profile.md]
 
 ## Steps for the Agent
 
-1. Read `spec-kit/MODULE_MAP.md` — find the entry for the module being bootstrapped.
+1. Read `agent-artifacts/spec-kit/MODULE_MAP.md` — find the entry for the module being bootstrapped.
 2. Read each source file listed in the `Key classes` field. If a file cannot be opened, note it as
    `[not read]` in the Key Files table — do not infer its contents.
 3. For each file you successfully read:
@@ -116,8 +116,8 @@ Context file:   [e.g., context/profile.md]
 4. Scan for existing test files (`*Test.kt`, `*Spec.kt`) in the module path.
 5. Write the context file filling in ONLY what you directly observed in steps 2–4.
    For anything you could not confirm, write `[not confirmed — verify with team]`.
-6. Save as `context/<module>.md`.
-7. Add a routing row to `context/_index.md`.
+6. Save as `agent-artifacts/context/<module>.md`.
+7. Add a routing row to `agent-artifacts/context/_index.md`.
 8. Write a completion report:
    - Files successfully read
    - Files that could not be opened (list as gaps)

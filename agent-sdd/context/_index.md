@@ -34,17 +34,12 @@ For tasks touching >1 module: load ALL matching context files, then proceed.
 | theme, color, typography, design token, shared component, button, card, composable | Core UI | `context/core-ui.md` |
 | analytics, tracking, firebase, event, screen view | Analytics | `context/analytics.md` |
 
-<!-- Add a row here whenever you add a new context/<module>.md file.
-     Keep keywords in sync with your ticket language — use the words your team writes in tickets.
-     If two modules share keywords, list both rows and let the agent load both.
-     Do NOT put routing logic in MODULE_MAP.md — this file is the single routing source of truth. -->
+<!-- Add a row here whenever you add a new context/<module>.md file. -->
 
 ---
 
 ## Notes for Humans
 
-- This file and `spec-kit/MODULE_MAP.md` serve different roles:
-  - `_index.md` (this file) — agent routing table: keyword → context file
-  - `MODULE_MAP.md` — module registry: path, pattern, DI, key classes, debt anchor
-- Keep both in sync when adding a new module (one row here + one entry there).
-- Keywords here should match the words your team uses in ticket descriptions and acceptance criteria.
+- `_index.md` (this file) — agent routing table: keyword → context file
+- `MODULE_MAP.md` — module registry: path, pattern, DI, key classes, debt anchor
+- Keep both in sync when adding a new module.

@@ -25,6 +25,11 @@
 
 ## Key Files
 
+<!-- Selection principle: this is a MAP, not a file inventory.
+     List entry points, base classes, DI wiring, and files with non-obvious roles
+     or known debt. OMIT routine API interfaces, one-line impls, and files an agent
+     would find trivially by name. Prefer ~10–15 high-signal rows; if you exceed
+     that, you're probably inventorying, not mapping — cut the obvious ones. -->
 | File (relative to codebase_path) | Role |
 |----------------------------------|------|
 | `path/to/[Name]ViewModel.kt` | [one-line description] |
@@ -83,19 +88,10 @@ No debt — leave this section empty if none.
 ## What the Agent Should Know
 
 <!-- Evidence rule: only document concrete behaviors observed in source code.
-     Valid: "ProfileFragment calls authService.logout() directly — not via ViewModel"
-     Invalid: "The SDK handles session management internally"
+     Example of valid entry: "ProfileFragment calls authService.logout() directly — not via ViewModel"
+     Example of invalid entry: "The SDK handles session management internally"
      For anything unconfirmed write: [not confirmed — verify with team] -->
 
 - "Never call [Class] directly from ViewModel — always through [UseCase]"
 - "[Field] is nullable in the API response but the UI assumes non-null — guard here"
 - "The [workaround] in [File]:L42 exists because [reason] — do not simplify it"
-- "Deep links into this module must check [condition] first — see [File] for the pattern"
-
-**Prompting questions to fill this section (delete these when done):**
-- Is there a class in this module that must never be called directly from outside? Why?
-- Is there a field that is nullable in the API or DB but the UI assumes non-null?
-- Is there a workaround that looks wrong but must not be removed or "cleaned up"?
-- Are there entry points (deep links, push notifications, back-stack) that require preconditions?
-- Is there a singleton or shared state that more than one module writes to?
-- Are there fields sourced from two places where one is authoritative and the other is stale?
