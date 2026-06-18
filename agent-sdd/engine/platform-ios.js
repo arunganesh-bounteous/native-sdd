@@ -1,7 +1,10 @@
 // ══════════════════════════════════════════════════════
 //  platform-ios.js
 //  iOS-specific code for the SDD Setup Wizard.
-//  Loaded before wizard-core.js.
+//  Loaded after platform-common.js and before wizard-core.js.
+//  Requires platform-common.js: renderCIDriftBanner, setSelectOption,
+//  applyArchitectureMD, parseIndexKeywords, addCustomRuleRow,
+//  addDebtRow, toggleMigScope, getApproachRows
 //  Requires wizard-core.js globals: state, getPills, getRadio,
 //  getDraftField, selectPill, pill, tierBadge, infoBtn, esc,
 //  updatePreview, saveFile, showToast, tryReadFile, countSourceFiles
@@ -70,6 +73,15 @@ function updateArchProgress() {
   }
 }
 
+// Creates a module chip using DOM APIs — safe against names containing special chars.
+function makeModuleChip(targetId, moduleName) {
+  const span = document.createElement('span');
+  span.className = 'mod-chip';
+  span.textContent = moduleName;
+  span.addEventListener('click', () => insertModuleChip(targetId, moduleName));
+  return span;
+}
+
 function insertModuleChip(targetId, name) {
   const el = document.getElementById(targetId);
   if (!el) return;
@@ -90,11 +102,12 @@ function refreshModuleChips() {
   if (!modules || modules.length === 0) return;
   document.querySelectorAll('.module-chips[data-target]').forEach(container => {
     const targetId = container.dataset.target;
-    container.innerHTML =
-      `<div class="module-chips-title">Modules</div>` +
-      modules.map(m =>
-        `<span class="mod-chip" onclick="insertModuleChip('${targetId}','${m.name}')">${m.name}</span>`
-      ).join('');
+    container.textContent = '';
+    const title = document.createElement('div');
+    title.className = 'module-chips-title';
+    title.textContent = 'Modules';
+    container.appendChild(title);
+    modules.forEach(m => container.appendChild(makeModuleChip(targetId, m.name)));
   });
   document.querySelectorAll('.approach-card .module-chips[data-target]').forEach(container => {
     populateApproachChips(container);
@@ -105,11 +118,12 @@ function populateApproachChips(container) {
   const modules = state.detectedModuleDetails;
   if (!modules || modules.length === 0) return;
   const targetId = container.dataset.target;
-  container.innerHTML =
-    `<div class="module-chips-title">Modules</div>` +
-    modules.map(m =>
-      `<span class="mod-chip" onclick="insertModuleChip('${targetId}','${m.name}')">${m.name}</span>`
-    ).join('');
+  container.textContent = '';
+  const title = document.createElement('div');
+  title.className = 'module-chips-title';
+  title.textContent = 'Modules';
+  container.appendChild(title);
+  modules.forEach(m => container.appendChild(makeModuleChip(targetId, m.name)));
 }
 
 const APPROACH_NOTES = {
@@ -144,33 +158,36 @@ function renderApproachRows(group) {
     if (approach && ta) saved[approach] = ta.value;
   });
 
+  // Build card HTML without injecting user-supplied values into innerHTML.
+  // Saved textarea values are applied via .value after insertion (XSS-safe).
   container.innerHTML = selected.map(approach => {
     const taId = `approach-${group}-${approach}`;
     const ph   = notes[approach] || 'describe which modules use this approach';
-    const val  = saved[approach] ?? getDraftField(taId);
-    return `<div class="approach-card" data-approach="${approach}">
-      <div class="approach-card-label">${approach}</div>
-      <textarea id="${taId}" rows="2"
-        placeholder="${ph}"
-        oninput="updatePreview('architecture'); updateArchProgress()">${val}</textarea>
+    return `<div class="approach-card" data-approach="${esc(approach)}">
+      <div class="approach-card-label">${esc(approach)}</div>
+      <textarea id="${esc(taId)}" rows="2"
+        placeholder="${esc(ph)}"
+        oninput="updatePreview('architecture'); updateArchProgress()"></textarea>
       <div class="module-chips-wrapper">
-        <div class="module-chips" data-target="${taId}"></div>
+        <div class="module-chips" data-target="${esc(taId)}"></div>
       </div>
     </div>`;
   }).join('');
 
+  // Restore saved values via .value — never via innerHTML — so no content can
+  // break out of the textarea or execute as markup.
+  container.querySelectorAll('.approach-card').forEach(card => {
+    const approach = card.dataset.approach;
+    const ta = card.querySelector('textarea');
+    if (approach && ta) {
+      const val = saved[approach] ?? getDraftField(`approach-${group}-${approach}`);
+      if (val) ta.value = val;
+    }
+  });
+
   container.querySelectorAll('.approach-card .module-chips[data-target]').forEach(c => populateApproachChips(c));
 }
 
-function getApproachRows(group) {
-  const rows = [];
-  document.querySelectorAll(`#arch-${group}-detail .approach-card`).forEach(card => {
-    const approach = card.dataset.approach || '';
-    const note     = (card.querySelector('textarea')?.value || '').trim();
-    rows.push({ approach, note });
-  });
-  return rows;
-}
 
 // ── Parse existing DATA_MODEL.md → entity + endpoint row objects ──
 function parseDataModelMD(text) {
@@ -221,18 +238,6 @@ function parseDataModelMD(text) {
 // Keywords are the single source of truth in _index.md (not MODULE_MAP). When
 // reloading a project we backfill them onto the module rows so re-saving the
 // wizard regenerates _index.md correctly instead of wiping the routing table.
-function parseIndexKeywords(text) {
-  const map = {};
-  for (const line of text.split('\n')) {
-    const m = line.match(/^\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|/);
-    if (!m) continue;
-    const keywords = m[1].trim();
-    const name     = m[2].trim();
-    if (!name || /^-+$/.test(name) || name.toLowerCase() === 'module') continue; // header/separator
-    map[name.toLowerCase()] = keywords;
-  }
-  return map;
-}
 
 // ── Parse existing MODULE_MAP.md → module row objects ────
 function parseModuleMapMD(text) {
@@ -645,6 +650,16 @@ async function analyzeProject() {
 
   state.detectedInterceptors = await scanForURLProtocols(state.dirHandle);
 
+  // ── Round-trip: reload ARCHITECTURE.md if it already exists ──────────────
+  // Do this AFTER Xcode-based detection so human edits take priority over
+  // auto-detected defaults. Only the fields present in the file are overwritten.
+  const existingArch = await tryReadFile(state.dirHandle, 'agent-artifacts', 'spec-kit', 'ARCHITECTURE.md');
+  if (existingArch) {
+    const parsed = parseArchitectureMD(existingArch);
+    applyArchitectureMD(parsed);
+    state.archRoundTripped = true;
+  }
+
   updatePreview('architecture');
   updatePreview('modules');
   refreshModuleChips();
@@ -655,23 +670,84 @@ async function analyzeProject() {
   const moduleSource = parsedModules.length > 0
     ? `${parsedModules.length} modules from MODULE_MAP.md`
     : allModules.length ? `${allModules.length} modules detected` : null;
+  const archNote = state.archRoundTripped ? 'ARCHITECTURE.md reloaded' : null;
   const summary = [
     mainBundleId    ? `bundle ID`    : null,
     moduleSource,
     schemeNames.length  ? `${schemeNames.length} schemes`  :
     buildConfigs.length ? `${buildConfigs.length} configs` : null,
     state.detectedInterceptors.length ? `${state.detectedInterceptors.length} interceptors` : null,
+    archNote,
   ].filter(Boolean).join(', ');
   showToast(`Auto-filled · ${summary || 'basic settings'} · review & adjust`, 'success');
+
+  // Run CI drift scan in background — populates banner when conventions step is viewed
+  scanCIDrift().then(drifts => {
+    state.ciDrift = drifts;
+    renderCIDriftBanner(drifts);
+    if (drifts.length > 0) {
+      showToast(`⚠️ ${drifts.length} CI drift issue${drifts.length > 1 ? 's' : ''} found — check Conventions step`, 'warning');
+    }
+  });
 }
 
-function setSelectOption(id, value) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  for (const opt of el.options) {
-    if (opt.value === value || opt.text === value) { el.value = opt.value; return; }
+// ── Round-trip: parse a previously generated ARCHITECTURE.md back into wizard UI ──
+function parseArchitectureMD(text) {
+  const result = {};
+
+  // ADR-001 — arch pattern from decision line
+  const archM = text.match(/ADR-001[\s\S]*?Decision\*\*:\s*Adopt\s+([\w+]+)\s+with/);
+  if (archM) result.arch = archM[1];
+
+  // ADR-002 — confirm from heading
+  if (!result.arch) {
+    if (/ADR-002 — TCA Pattern/.test(text))   result.arch = 'TCA';
+    else if (/ADR-002 — MVVM Pattern/.test(text)) result.arch = 'MVVM';
   }
+
+  // ADR-003 — DI
+  if (/ADR-003 — Dependency Injection \(Manual/.test(text)) result.di = 'Manual';
+  if (!result.di) {
+    const diM = text.match(/ADR-003[\s\S]*?Decision\*\*:\s*([\w\- /]+)\s+is the sole DI/);
+    if (diM) result.di = diM[1].trim();
+  }
+
+  // ADR-004 — Navigation
+  if (/ADR-004 — Navigation with NavigationStack/.test(text)) result.nav = 'NavigationStack';
+  else if (/ADR-004 — Navigation.*TCA/.test(text))            result.nav = 'TCA';
+  else if (/ADR-004 — Navigation.*Coordinator/.test(text))    result.nav = 'Coordinator';
+
+  // CONVENTIONS — UI
+  const uiM = text.match(/### UI\n([\s\S]*?)(?=\n###|\n---|\n##|$)/);
+  if (uiM) {
+    const uiBlock = uiM[1];
+    if (/SwiftUI/i.test(uiBlock) && /UIKit/i.test(uiBlock)) result.ui = 'Mixed';
+    else if (/SwiftUI/i.test(uiBlock)) result.ui = 'SwiftUI';
+    else if (/UIKit/i.test(uiBlock))  result.ui = 'UIKit';
+  }
+
+  // CONVENTIONS — Async
+  if (/async\/await/.test(text) || /Swift async/.test(text)) {
+    result.asyncLibs = ['async/await'];
+    if (/Combine/.test(text)) result.asyncLibs.push('Combine');
+    if (/RxSwift/.test(text)) result.asyncLibs.push('RxSwift');
+  }
+
+  // CONVENTIONS — DI fallback
+  if (!result.di) {
+    const diM2 = text.match(/### DI\n([^\n]+)/);
+    if (diM2) {
+      const line = diM2[1].trim();
+      if (/Manual/i.test(line))    result.di = 'Manual';
+      else if (/Swinject/i.test(line)) result.di = 'Swinject';
+      else if (/Needle/i.test(line))   result.di = 'Needle';
+    }
+  }
+
+  return result;
 }
+
+
 
 function guessModuleKeywords(moduleName) {
   const name = moduleName.replace(/[-_]/g, ' ').toLowerCase();
@@ -1104,6 +1180,11 @@ function generateArchitectureMD() {
   const today       = new Date().toISOString().split('T')[0];
   const primaryLang = langs[0] || 'Swift';
   const bundleId    = document.getElementById('cfg-bundle-id')?.value?.trim() || 'com.example.app';
+
+  const archDetected = !!arch;
+  const diDetected   = !!di;
+  const unverified   = (name) =>
+    `\n  > ⚠️ [auto-detected: ${name} — verify this matches your codebase before treating it as final]`;
   const appName     = bundleId.split('.').pop() || 'App';
 
   function approachRowsToMD(group, pills, placeholder) {
@@ -1149,7 +1230,7 @@ function generateArchitectureMD() {
 
   const adr001 = `### ADR-001 — Layer Structure and Dependency Rule
 - **Date**: ${today}
-- **Decision**: Adopt ${arch || 'MVVM'} with strict unidirectional dependency flow.
+- **Decision**: Adopt ${arch || 'MVVM'} with strict unidirectional dependency flow.${archDetected ? '' : unverified('MVVM')}
 - **Reason**: Enforces separation of concerns, testability, and prevents coupling between layers.
 - **Consequence**: Every new file must be placed in the correct layer. PRs that violate the dependency rule are rejected.
 
@@ -1175,7 +1256,7 @@ ${layerPackageTree}
   if (arch === 'TCA') {
     adr002 = `### ADR-002 — TCA Pattern: Reducer + Store + View
 - **Date**: ${today}
-- **Decision**: All feature screens follow the TCA contract below.
+- **Decision**: All feature screens follow the TCA contract below.${archDetected ? '' : unverified('TCA')}
 - **Reason**: Unidirectional data flow, exhaustive testing of state mutations, composable state.
 - **Consequence**: Every screen ships with a \`Reducer\`, a \`Store\`, and a stateless \`View\`.
 
@@ -1237,7 +1318,7 @@ struct ExampleView: View {
   } else if (arch === 'MVVM' || !arch) {
     adr002 = `### ADR-002 — MVVM Pattern: ViewModel + View
 - **Date**: ${today}
-- **Decision**: All feature screens follow the MVVM contract below.
+- **Decision**: All feature screens follow the MVVM contract below.${archDetected ? '' : unverified('MVVM')}
 - **Reason**: Clear separation between UI and business logic; ViewModel is independently testable.
 - **Consequence**: Every screen ships with a \`ViewModel\` and a stateless \`View\`.
 
@@ -1286,7 +1367,7 @@ struct ExampleView: View {
   if (diName === 'Manual') {
     adr003 = `### ADR-003 — Dependency Injection (Manual / Protocol-based)
 - **Date**: ${today}
-- **Decision**: Dependencies injected via constructor. No DI framework.
+- **Decision**: Dependencies injected via constructor. No DI framework.${diDetected ? '' : unverified('Manual / Protocol-based')}
 - **Reason**: Simple, compile-time safe, no additional dependencies.
 - **Consequence**: All dependencies declared in \`init()\`. Use protocols for testability.
 
@@ -1319,7 +1400,7 @@ struct MyApp: App {
   } else {
     adr003 = `### ADR-003 — Dependency Injection with ${diName}
 - **Date**: ${today}
-- **Decision**: ${diName} is the sole DI framework. No manual service locator singletons.
+- **Decision**: ${diName} is the sole DI framework. No manual service locator singletons.${diDetected ? '' : unverified(diName)}
 - **Reason**: Consistent dependency resolution across modules.
 - **Consequence**: All dependencies registered at app startup. Direct instantiation of injectable types is forbidden.`;
   }
@@ -1511,7 +1592,7 @@ ${arch === 'TCA'   ? 'TCA — Reducer + Store + Effect. Fully unidirectional.' :
   (arch || 'MVVM') + '\n[describe target state]'}
 
 ### DI
-${di || 'Manual / Protocol-based'} everywhere. No singletons except AppConfig.
+${di || 'Manual / Protocol-based'} everywhere. No singletons except AppConfig.${diDetected ? '' : unverified('Manual / Protocol-based')}
 
 ### Async
 Swift async/await everywhere.${hasRxSwift ? ' RxSwift being removed incrementally.' : ''}${hasCombine ? ' Combine being replaced with async/await + AsyncStream.' : ''}
@@ -1544,6 +1625,9 @@ ${adrBlocks}
 function buildConventionsScreen(fp) {
   fp.innerHTML += `
   <div class="step-screen" id="screen-conventions">
+
+    <div id="ci-drift-banner" style="display:none" class="form-section" style="background:var(--warning-bg,#fff8e1);border-left:4px solid var(--warning,#f59e0b);padding:12px 16px;border-radius:6px;margin-bottom:16px"></div>
+
     <div class="form-section">
       <h3>Package / Module Prefix ${infoBtn('Used in the generated package structure example. e.g. <code>com.example.myapp</code> or simply <code>MyApp</code> for Swift.')}</h3>
       <div class="form-row">
@@ -1626,6 +1710,88 @@ function buildConventionsScreen(fp) {
     </div>
   </div>`;
 }
+
+// ── CI Drift scanner (iOS) ─────────────────────────────────────────────────
+async function scanCIDrift() {
+  if (!state.dirHandle) return [];
+  const drifts = [];
+  const ciFiles = {};
+
+  // .github/workflows/*.yml
+  try {
+    const ghDir = await state.dirHandle.getDirectoryHandle('.github');
+    const wfDir = await ghDir.getDirectoryHandle('workflows');
+    for await (const [name, handle] of wfDir) {
+      if (handle.kind === 'file' && (name.endsWith('.yml') || name.endsWith('.yaml'))) {
+        try { ciFiles[`.github/workflows/${name}`] = await (await handle.getFile()).text(); } catch {}
+      }
+    }
+  } catch {}
+
+  // fastlane/Fastfile
+  try {
+    const flDir = await state.dirHandle.getDirectoryHandle('fastlane');
+    const fh = await flDir.getFileHandle('Fastfile');
+    ciFiles['fastlane/Fastfile'] = await (await fh.getFile()).text();
+  } catch {}
+
+  // Xcode Cloud — ci_scripts/
+  try {
+    const ciScriptsDir = await state.dirHandle.getDirectoryHandle('ci_scripts');
+    for await (const [name, handle] of ciScriptsDir) {
+      if (handle.kind === 'file') {
+        try { ciFiles[`ci_scripts/${name}`] = await (await handle.getFile()).text(); } catch {}
+      }
+    }
+  } catch {}
+
+  if (Object.keys(ciFiles).length === 0) return [];
+
+  const allCIText = Object.values(ciFiles).join('\n');
+
+  // Check 1: Swift version / Xcode version in CI
+  const xcodeM  = allCIText.match(/xcode(?:-version)?[:\s]+['"]?(\d+[\.\d]*)['"]?/i);
+  const swiftM   = allCIText.match(/swift[-_]version[:\s]+['"]?(\d+[\.\d]*)['"]?/i);
+  if (xcodeM) {
+    const xcVer = parseFloat(xcodeM[1]);
+    if (xcVer < 15) {
+      drifts.push({
+        field: 'Xcode version',
+        ciValue: `Xcode ${xcodeM[1]}`,
+        specValue: 'Xcode 15+ (required for Swift 5.9 / Swift Macros)',
+        file: Object.keys(ciFiles).find(f => ciFiles[f].includes(xcodeM[0])),
+      });
+    }
+  }
+
+  // Check 2: SwiftLint gate
+  const lintGateScript = (await tryReadFile(state.dirHandle, '.claude', 'hooks', 'scripts', 'lint-gate.sh')) || '';
+  const lintGateActive = /swiftlint/i.test(lintGateScript);
+  const ciRunsSwiftLint = /swiftlint/i.test(allCIText);
+  if (lintGateActive && !ciRunsSwiftLint) {
+    drifts.push({
+      field: 'SwiftLint',
+      ciValue: 'not enforced in CI',
+      specValue: 'enforced via hook (lint-gate.sh)',
+      file: Object.keys(ciFiles)[0],
+    });
+  }
+
+  // Check 3: Test coverage
+  const ciHasCoverage = /codecov|coverage|xcresult.*coverage|slather/i.test(allCIText);
+  const covInputEl = document.getElementById('cov-domain');
+  if (covInputEl && !ciHasCoverage) {
+    drifts.push({
+      field: 'Coverage gate',
+      ciValue: 'no coverage report/gate found in CI',
+      specValue: 'coverage thresholds set in CONVENTIONS',
+      file: Object.keys(ciFiles)[0],
+    });
+  }
+
+  return drifts;
+}
+
 
 function generateConventionsMD() {
   const pkg          = document.getElementById('conv-package')?.value.trim() || 'MyApp';
@@ -1894,30 +2060,7 @@ function buildMigrationsScreen(fp) {
 }
 
 let customRuleCounter = 0;
-function addCustomRuleRow(defaults = {}) {
-  const id = ++customRuleCounter;
-  const row = document.createElement('div');
-  row.className = 'dynamic-item'; row.id = 'custom-rule-row-' + id;
-  row.innerHTML = `
-    <button class="remove-btn" onclick="document.getElementById('custom-rule-row-${id}').remove(); updatePreview('migrations'); saveDraft()">✕</button>
-    <div class="form-row">
-      <label>Rule title</label>
-      <input type="text" id="custom-rule-title-${id}" value="${esc(defaults.title||'')}" placeholder="e.g. Kingfisher → SDWebImage, Custom Logger" oninput="updatePreview('migrations');saveDraft()" style="font-size:13px">
-    </div>
-    <div class="form-row">
-      <label style="align-self:flex-start;padding-top:4px">Rule body</label>
-      <textarea id="custom-rule-body-${id}" rows="4" placeholder="Describe what the agent should do when touching files that use this pattern. Use the same style as the rules above — bullet points work well." oninput="updatePreview('migrations');saveDraft()" style="font-size:12px;font-family:var(--mono);resize:vertical;width:100%">${esc(defaults.body||'')}</textarea>
-    </div>`;
-  document.getElementById('custom-rules-list').appendChild(row);
-  const countEl = document.getElementById('custom-rule-count');
-  if (countEl) { countEl.value = customRuleCounter; saveDraft(); }
-}
 
-function toggleMigScope(id) {
-  const checked = document.getElementById('mig-' + id)?.checked;
-  const row     = document.getElementById('mig-scope-row-' + id);
-  if (row) row.style.display = checked ? 'block' : 'none';
-}
 
 function generateNewScreensTable() {
   const ui      = getRadio('ui')   || 'SwiftUI';
@@ -2282,40 +2425,6 @@ function buildDebtScreen(fp) {
 }
 
 let debtCounter = 0;
-function addDebtRow(defaults = {}) {
-  const id  = ++debtCounter;
-  const num = String(id).padStart(3, '0');
-  const row = document.createElement('div');
-  row.className = 'dynamic-item'; row.id = 'debt-row-' + id;
-  row.innerHTML = `
-    <button class="remove-btn" onclick="document.getElementById('debt-row-${id}').remove(); updatePreview('debt')">✕</button>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-      <span style="font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:700">DEBT-${num}</span>
-    </div>
-    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px">
-      <div class="form-row"><label>Title</label>
-        <input type="text" class="debt-title" value="${esc(defaults.title||'')}" placeholder="LoginViewModel uses Combine instead of async/await" oninput="updatePreview('debt')"></div>
-      <div class="form-row"><label>Module</label>
-        <input type="text" class="debt-module" value="${esc(defaults.module||'')}" placeholder="AuthFeature" oninput="updatePreview('debt')"></div>
-      <div class="form-row"><label>Status</label>
-        <select class="debt-status" onchange="updatePreview('debt')">
-          <option value="OPEN"${(defaults.status||'OPEN')==='OPEN'?' selected':''}>OPEN</option>
-          <option value="SCHEDULED"${defaults.status==='SCHEDULED'?' selected':''}>SCHEDULED</option>
-          <option value="RESOLVED"${defaults.status==='RESOLVED'?' selected':''}>RESOLVED</option>
-        </select></div>
-    </div>
-    <div class="form-row"><label>Location (file path)</label>
-      <input type="text" class="debt-location" placeholder="Sources/AuthFeature/AuthViewModel.swift" oninput="updatePreview('debt')"></div>
-    <div class="form-row"><label>Impact</label>
-      <input type="text" class="debt-impact" placeholder="Cannot test async flows with XCTestExpectation cleanly." oninput="updatePreview('debt')"></div>
-    <div class="form-row"><label>Agent Rule (exact instruction)</label>
-      <input type="text" class="debt-rule" placeholder="Do not add new Combine pipelines here. New async work uses async/await." oninput="updatePreview('debt')"></div>
-    <div class="form-row"><label>Scheduled Ticket (if any)</label>
-      <input type="text" class="debt-ticket" placeholder="APP-88 or —" oninput="updatePreview('debt')"></div>
-  `;
-  document.getElementById('debt-list').appendChild(row);
-  updatePreview('debt');
-}
 
 function generateDebtMD() {
   const rows     = Array.from(document.querySelectorAll('[id^="debt-row-"]'));

@@ -38,6 +38,7 @@ const CHANGELOG_FILE = path.join(ROOT, 'CHANGELOG.md');
 
 // const name  →  source file (relative to agent-sdd/)
 const MAP = {
+  EMBEDDED_PLATFORM_COMMON:    'engine/platform-common.js',
   EMBEDDED_PLATFORM_ANDROID:   'engine/platform-android.js',
   EMBEDDED_PLATFORM_IOS:       'engine/platform-ios.js',
   EMBEDDED_CLAUDE_MD:          'CLAUDE.md',
@@ -45,14 +46,14 @@ const MAP = {
   EMBEDDED_BOOTSTRAP_TEMPLATE: 'tasks/BOOTSTRAP_TEMPLATE.md',
   EMBEDDED_CONTEXT_TEMPLATE:   'context/TEMPLATE.md',
   EMBEDDED_CONTEXT_INDEX:      'context/_index.md',
-  EMBEDDED_SKILLS_INDEX:       'skills/_index.md',
-  EMBEDDED_SKILL_ADA:          'skills/ada.md',
-  EMBEDDED_SKILL_ANALYTICS:    'skills/analytics.md',
   EMBEDDED_HOOKS_SETTINGS:     'hooks/settings.json',
   EMBEDDED_GIT_GUARD_SH:       'hooks/scripts/git-guard.sh',
   EMBEDDED_PROTECTED_PATHS_SH: 'hooks/scripts/protected-paths.sh',
   EMBEDDED_LINT_GATE_SH:       'hooks/scripts/lint-gate.sh',
   EMBEDDED_DONE_GATE_SH:       'hooks/scripts/done-gate.sh',
+  // Claude Code project skills and commands — written to .claude/ in the user's project
+  EMBEDDED_ANDROID_PR_SKILL:   '.claude/skills/android-pr-review/SKILL.md',
+  EMBEDDED_ANDROID_PR_COMMAND: '.claude/commands/android-pr-review.md',
 };
 
 // Escape a raw string so it survives inside a JS template literal (`...`).
@@ -98,10 +99,18 @@ function parseChangelog(md) {
     if (/^##\s/.test(line)) { cur = null; continue; }   // non-version section
     if (cur) {
       const b = line.match(/^\s*[-*]\s+(.*\S)\s*$/);
-      if (b) out[cur].notes.push(b[1].trim());
-      else if (out[cur].notes.length && /\S/.test(line)) {
-        // continuation line of the previous bullet (wrapped text)
-        out[cur].notes[out[cur].notes.length - 1] += ' ' + line.trim();
+      if (b) {
+        out[cur].notes.push(b[1].trim());
+      } else if (out[cur].notes.length && /\S/.test(line)) {
+        // Stop continuation at section headers (**bold**), numbered list items,
+        // or blank-then-content blocks that start a new paragraph.
+        const isNewBlock = /^\*\*/.test(line.trim()) || /^\d+\./.test(line.trim());
+        if (!isNewBlock) {
+          // continuation line of the previous bullet (wrapped text)
+          out[cur].notes[out[cur].notes.length - 1] += ' ' + line.trim();
+        }
+        // else: silently discard — it's a prose paragraph (update instructions etc.)
+        // that doesn't belong in the UI bullet list
       }
     }
   }

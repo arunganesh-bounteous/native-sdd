@@ -19,7 +19,7 @@ primary_language: Kotlin
 
 ## Android-specific (remove section if not Android)
 
-package_name: com.wearehathway.apps.stock
+package_name: com.example.myapp
 # Base source package — matches source directory structure.
 # applicationId varies by build variant:
 #   development:  com.example.app.development

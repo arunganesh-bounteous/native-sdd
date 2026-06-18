@@ -5,7 +5,11 @@
 VIOLATIONS=()
 
 if git rev-parse --git-dir &>/dev/null; then
-  MODIFIED=$(git diff --name-only 2>/dev/null; git diff --cached --name-only 2>/dev/null)
+  # Include untracked files — a newly created file in a protected dir is just as
+  # problematic as a modification to an existing one.
+  MODIFIED=$(git diff --name-only 2>/dev/null
+             git diff --cached --name-only 2>/dev/null
+             git ls-files --others --exclude-standard 2>/dev/null)
 
   while IFS= read -r f; do
     [ -z "$f" ] && continue

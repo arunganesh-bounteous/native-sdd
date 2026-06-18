@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # PreToolUse hook — blocks writes to generated/tool files that agents must never touch.
+# Covers both direct file tool calls (Write/Edit/MultiEdit) and Bash commands
+# that write to protected paths (sed -i, echo >>, mv, cp, tee, etc.).
 
 INPUT=$(cat)
 
+# ── Extract file path from direct file-tool calls (Write / Edit / MultiEdit) ─
 FILE_PATH=$(echo "$INPUT" | python3 -c "
 import sys, json
 try:
@@ -13,7 +16,20 @@ except Exception:
     print('')
 " 2>/dev/null)
 
-if [ -z "$FILE_PATH" ]; then
+# ── Extract Bash command (if the tool is Bash) ────────────────────────────────
+BASH_CMD=$(echo "$INPUT" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    if data.get('tool_name', '').lower() == 'bash':
+        print(data.get('tool_input', {}).get('command', ''))
+    else:
+        print('')
+except Exception:
+    print('')
+" 2>/dev/null)
+
+if [ -z "$FILE_PATH" ] && [ -z "$BASH_CMD" ]; then
   exit 0
 fi
 
@@ -55,5 +71,18 @@ deny() {
 # ── Build output directories ──────────────────────────────────────────────────
 [[ "$CLEAN" == */build/* || "$CLEAN" == build/* ]] && deny "build/ is a generated output directory — do not write files here."
 [[ "$CLEAN" == DerivedData/* || "$CLEAN" == */DerivedData/* ]] && deny "DerivedData/ is Xcode's build cache — do not write files here."
+
+# ── Bash write detection ──────────────────────────────────────────────────────
+# Guard against Bash commands that write to protected paths.
+# Checks for: sed -i, echo/printf >, >>, mv, cp, tee, install targeting a protected path.
+if [ -n "$BASH_CMD" ]; then
+  PROTECTED_PATTERN='agent-artifacts/CLAUDE\.md|agent-artifacts/spec-kit/|agent-sdd/'
+  WRITE_OPS_PATTERN='sed[[:space:]]+-i|>|>>|[[:space:]]mv[[:space:]]|[[:space:]]cp[[:space:]]|[[:space:]]tee[[:space:]]|[[:space:]]install[[:space:]]'
+
+  if echo "$BASH_CMD" | grep -qE "$PROTECTED_PATTERN" && \
+     echo "$BASH_CMD" | grep -qE "$WRITE_OPS_PATTERN"; then
+    deny "Bash write to a protected path detected — agent-artifacts/spec-kit/, agent-artifacts/CLAUDE.md, and agent-sdd/ are read-only. Use the wizard to regenerate AI artifacts."
+  fi
+fi
 
 exit 0

@@ -1,7 +1,10 @@
 // ══════════════════════════════════════════════════════
 //  platform-android.js
 //  Android-specific code for the SDD Setup Wizard.
-//  Loaded before wizard-core.js.
+//  Loaded after platform-common.js and before wizard-core.js.
+//  Requires platform-common.js: renderCIDriftBanner, setSelectOption,
+//  applyArchitectureMD, parseIndexKeywords, addCustomRuleRow,
+//  addDebtRow, toggleMigScope, getApproachRows
 //  Requires wizard-core.js globals: state, getPills, getRadio,
 //  getDraftField, selectPill, pill, tierBadge, infoBtn, esc,
 //  updatePreview, saveFile, showToast, tryReadFile, countSourceFiles
@@ -75,6 +78,15 @@ function updateArchProgress() {
 }
 
 // Inserts a module name at the cursor position of a textarea.
+// Creates a module chip using DOM APIs — safe against names containing special chars.
+function makeModuleChip(targetId, moduleName) {
+  const span = document.createElement('span');
+  span.className = 'mod-chip';
+  span.textContent = moduleName;
+  span.addEventListener('click', () => insertModuleChip(targetId, moduleName));
+  return span;
+}
+
 // Auto-prefixes ", " when the cursor follows non-whitespace text on the same line,
 // so chips never run directly into adjacent words.
 function insertModuleChip(targetId, name) {
@@ -101,11 +113,12 @@ function refreshModuleChips() {
   // Static chip containers (storage, etc.)
   document.querySelectorAll('.module-chips[data-target]').forEach(container => {
     const targetId = container.dataset.target;
-    container.innerHTML =
-      `<div class="module-chips-title">Modules</div>` +
-      modules.map(m =>
-        `<span class="mod-chip" onclick="insertModuleChip('${targetId}','${m.name}')">${m.name}</span>`
-      ).join('');
+    container.textContent = '';
+    const title = document.createElement('div');
+    title.className = 'module-chips-title';
+    title.textContent = 'Modules';
+    container.appendChild(title);
+    modules.forEach(m => container.appendChild(makeModuleChip(targetId, m.name)));
   });
   // Dynamic per-approach cards (async / state)
   document.querySelectorAll('.approach-card .module-chips[data-target]').forEach(container => {
@@ -118,11 +131,12 @@ function populateApproachChips(container) {
   const modules = state.detectedModuleDetails;
   if (!modules || modules.length === 0) return;
   const targetId = container.dataset.target;
-  container.innerHTML =
-    `<div class="module-chips-title">Modules</div>` +
-    modules.map(m =>
-      `<span class="mod-chip" onclick="insertModuleChip('${targetId}','${m.name}')">${m.name}</span>`
-    ).join('');
+  container.textContent = '';
+  const title = document.createElement('div');
+  title.className = 'module-chips-title';
+  title.textContent = 'Modules';
+  container.appendChild(title);
+  modules.forEach(m => container.appendChild(makeModuleChip(targetId, m.name)));
 }
 
 // Placeholder hints per approach value, used inside per-approach textarea.
@@ -162,36 +176,38 @@ function renderApproachRows(group) {
     if (approach && ta) saved[approach] = ta.value;
   });
 
+  // Build card HTML without injecting user-supplied values into innerHTML.
+  // Saved textarea values are applied via .value after insertion (XSS-safe).
   container.innerHTML = selected.map(approach => {
     const taId = `approach-${group}-${approach}`;
     const ph   = notes[approach] || 'describe which modules use this approach';
-    // Prefer current DOM value, then localStorage draft, then empty.
-    const val  = saved[approach] ?? getDraftField(taId);
-    return `<div class="approach-card" data-approach="${approach}">
-      <div class="approach-card-label">${approach}</div>
-      <textarea id="${taId}" rows="2"
-        placeholder="${ph}"
-        oninput="updatePreview('architecture'); updateArchProgress()">${val}</textarea>
+    return `<div class="approach-card" data-approach="${esc(approach)}">
+      <div class="approach-card-label">${esc(approach)}</div>
+      <textarea id="${esc(taId)}" rows="2"
+        placeholder="${esc(ph)}"
+        oninput="updatePreview('architecture'); updateArchProgress()"></textarea>
       <div class="module-chips-wrapper">
-        <div class="module-chips" data-target="${taId}"></div>
+        <div class="module-chips" data-target="${esc(taId)}"></div>
       </div>
     </div>`;
   }).join('');
+
+  // Restore saved values via .value — never via innerHTML — so no content can
+  // break out of the textarea or execute as markup.
+  container.querySelectorAll('.approach-card').forEach(card => {
+    const approach = card.dataset.approach;
+    const ta = card.querySelector('textarea');
+    if (approach && ta) {
+      const val = saved[approach] ?? getDraftField(`approach-${group}-${approach}`);
+      if (val) ta.value = val;
+    }
+  });
 
   // Populate chips in the newly rendered cards.
   container.querySelectorAll('.approach-card .module-chips[data-target]').forEach(c => populateApproachChips(c));
 }
 
 // Reads all approach-card textareas for a group → array of {approach, note} pairs.
-function getApproachRows(group) {
-  const rows = [];
-  document.querySelectorAll(`#arch-${group}-detail .approach-card`).forEach(card => {
-    const approach = card.dataset.approach || '';
-    const note = (card.querySelector('textarea')?.value || '').trim();
-    rows.push({ approach, note });
-  });
-  return rows;
-}
 
 // ── Parse existing DATA_MODEL.md → entity + endpoint row objects ──
 function parseDataModelMD(text) {
@@ -244,18 +260,6 @@ function parseDataModelMD(text) {
 // Keywords are the single source of truth in _index.md (not MODULE_MAP). When
 // reloading a project we backfill them onto the module rows so re-saving the
 // wizard regenerates _index.md correctly instead of wiping the routing table.
-function parseIndexKeywords(text) {
-  const map = {};
-  for (const line of text.split('\n')) {
-    const m = line.match(/^\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|/);
-    if (!m) continue;
-    const keywords = m[1].trim();
-    const name     = m[2].trim();
-    if (!name || /^-+$/.test(name) || name.toLowerCase() === 'module') continue; // header/separator
-    map[name.toLowerCase()] = keywords;
-  }
-  return map;
-}
 
 // ── Parse existing MODULE_MAP.md → module row objects ────
 function parseModuleMapMD(text) {
@@ -344,7 +348,7 @@ async function analyzeProject() {
   let appGradle = await tryReadFile(state.dirHandle, 'app', 'build.gradle')
                ?? await tryReadFile(state.dirHandle, 'app', 'build.gradle.kts');
   if (!appGradle && settings) {
-    const moduleNames = [...settings.matchAll(/include\s*['"]:?([\w\-]+)['"]/g)].map(m => m[1]);
+    const moduleNames = [...settings.matchAll(/["']:?([\w\-]+)['"]/g)].map(m => m[1]);
     for (const mod of moduleNames) {
       if (mod === 'app') continue; // already tried
       const candidate = await tryReadFile(state.dirHandle, mod, 'build.gradle')
@@ -377,9 +381,18 @@ async function analyzeProject() {
                  : has('squareup.picasso') ? 'Picasso'
                  : has('bumptech.glide', '"glide"') ? 'Glide' : '';
 
-  // Extract module names from settings.gradle
-  const moduleNames = [...((settings || '').matchAll(/include\s*[\(]?\s*["':]([\w\-:]+)["']/g))]
-    .map(m => (m[1].startsWith(':') ? m[1] : ':' + m[1]));
+  // Extract module names from settings.gradle.
+  // Handles both single-arg and multi-arg include() forms, e.g.:
+  //   include ':app', ':core', ':feature-home'          (Groovy)
+  //   include(":app", ":core", ":feature-home")         (Groovy / KTS)
+  //   include(":app")                                   (KTS single)
+  const moduleNames = [];
+  for (const lineMatch of ((settings || '').matchAll(/include\s*[\(]?([^)\n]+)[\)]?/g))) {
+    for (const argMatch of lineMatch[1].matchAll(/["']:?([\w\-:]+)["']/g)) {
+      const name = argMatch[1].startsWith(':') ? argMatch[1] : ':' + argMatch[1];
+      if (!moduleNames.includes(name)) moduleNames.push(name);
+    }
+  }
 
   // ── Extract Project Config fields (preserve case — do not use lowercased gradle) ──
   const appIdMatch    = (appGradle || '').match(/\bapplicationId\b\s*=?\s*["']([^"']+)["']/);
@@ -514,6 +527,16 @@ async function analyzeProject() {
     if (entList && entities.length > 0) { entList.innerHTML = ''; entityCounter = 0; entities.forEach(e => addEntityRow(e)); }
   }
 
+  // ── Round-trip: reload ARCHITECTURE.md if it already exists ──────────────
+  // Do this AFTER Gradle-based detection so human edits take priority over
+  // auto-detected defaults. Only the fields present in the file are overwritten.
+  const existingArch = await tryReadFile(state.dirHandle, 'agent-artifacts', 'spec-kit', 'ARCHITECTURE.md');
+  if (existingArch) {
+    const parsed = parseArchitectureMD(existingArch);
+    applyArchitectureMD(parsed);
+    state.archRoundTripped = true;
+  }
+
   // ── Scan for OkHttp Interceptors ─────────────────────
   state.detectedInterceptors = await scanForInterceptors(state.dirHandle);
 
@@ -552,16 +575,77 @@ async function analyzeProject() {
   const moduleSource = parsedModules.length > 0
     ? `${parsedModules.length} modules loaded from MODULE_MAP.md`
     : `${moduleNames.length} modules detected from Gradle`;
-  showToast(`Auto-filled · ${moduleSource}, ${state.detectedInterceptors.length} interceptors · review & adjust`, 'success');
+  const archNote = state.archRoundTripped ? ', ARCHITECTURE.md reloaded' : '';
+  showToast(`Auto-filled · ${moduleSource}, ${state.detectedInterceptors.length} interceptors${archNote} · review & adjust`, 'success');
+
+  // Run CI drift scan in background — populates banner when conventions step is viewed
+  scanCIDrift().then(drifts => {
+    state.ciDrift = drifts;
+    renderCIDriftBanner(drifts);
+    if (drifts.length > 0) {
+      showToast(`⚠️ ${drifts.length} CI drift issue${drifts.length > 1 ? 's' : ''} found — check Conventions step`, 'warning');
+    }
+  });
 }
 
-function setSelectOption(id, value) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  for (const opt of el.options) {
-    if (opt.value === value || opt.text === value) { el.value = opt.value; return; }
+// ── Round-trip: parse a previously generated ARCHITECTURE.md back into wizard UI ──
+// Returns an object with the values it could confidently extract.
+function parseArchitectureMD(text) {
+  const result = {};
+
+  // ADR-001 — arch pattern
+  // Line: "- **Decision**: Adopt Clean+MVI with strict ..."
+  const archM = text.match(/ADR-001[\s\S]*?Decision\*\*:\s*Adopt\s+([\w+]+)\s+with/);
+  if (archM) result.arch = archM[1];
+
+  // ADR-002 — confirm pattern from heading (more reliable than decision text)
+  if (!result.arch) {
+    if (/ADR-002 — MVI Pattern/.test(text))  result.arch = 'Clean+MVI';
+    else if (/ADR-002 — MVVM Pattern/.test(text)) result.arch = 'MVVM';
   }
+
+  // ADR-003 — DI framework
+  const diM = text.match(/ADR-003[\s\S]*?Decision\*\*:\s*(Hilt|Koin|Dagger)\s+is the sole DI/);
+  if (diM) result.di = diM[1];
+  if (!result.di && /ADR-003 — Dependency Injection \(Manual/.test(text)) result.di = 'Manual';
+
+  // ADR-004 — Navigation (heading is reliable)
+  if (/ADR-004 — Navigation with NavigationStack/.test(text))       result.nav = 'NavigationStack';
+  else if (/ADR-004 — Navigation with Jetpack Compose/.test(text))  result.nav = 'ComposeNav';
+  else if (/ADR-004 — Navigation with Jetpack Navigation Component/.test(text)) result.nav = 'JetpackNav';
+
+  // CONVENTIONS — UI framework (### UI section)
+  const uiM = text.match(/### UI\n([\s\S]*?)(?=\n###|\n---|\n##|$)/);
+  if (uiM) {
+    const uiBlock = uiM[1];
+    if (/Compose.*Material 3/i.test(uiBlock) && /Existing XML/i.test(uiBlock)) result.ui = 'Mixed';
+    else if (/Jetpack Compose.*Material 3/i.test(uiBlock)) result.ui = 'Compose';
+    else if (/XML layout/i.test(uiBlock)) result.ui = 'XML';
+  }
+
+  // CONVENTIONS — Async (### Async section)
+  if (/Kotlin Coroutines/.test(text)) result.asyncLibs = ['Coroutines'];
+  if (/\+ Flow/.test(text))           (result.asyncLibs = result.asyncLibs || []).includes('Flow') || result.asyncLibs.push('Flow');
+  if (/RxJava/.test(text))            (result.asyncLibs = result.asyncLibs || []).includes('RxJava3') || result.asyncLibs.push('RxJava3');
+
+  // CONVENTIONS — DI section fallback
+  if (!result.di) {
+    const diM2 = text.match(/### DI\n([^\n]+)/);
+    if (diM2) {
+      const line = diM2[1].trim();
+      if (line.startsWith('Hilt'))  result.di = 'Hilt';
+      else if (line.startsWith('Koin'))   result.di = 'Koin';
+      else if (line.startsWith('Dagger')) result.di = 'Dagger';
+      else if (line.startsWith('Manual')) result.di = 'Manual';
+    }
+  }
+
+  return result;
 }
+
+// Apply parsed ARCHITECTURE.md values into wizard UI — only overrides values
+// that are explicitly present in the parsed result (no blanket resets).
+
 
 function guessModuleKeywords(moduleName) {
   const name = moduleName.replace(/^:/, '').replace(/[-:]/g, ' ').toLowerCase();
@@ -1045,6 +1129,14 @@ function generateArchitectureMD() {
 
   // ── ADR helpers ──────────────────────────────────────────────────────────
 
+  // Confidence helpers — used throughout the generated markdown.
+  // When a value was auto-detected from source files it can be stated confidently.
+  // When it fell back to a default (detection found nothing) we flag it for human review.
+  const archDetected = !!arch;
+  const diDetected   = !!di;
+  const unverified   = (name) =>
+    `\n  > ⚠️ [auto-detected: ${name} — verify this matches your codebase before treating it as final]`;
+
   // ADR-001: Layer Structure
   const layerPackageTree = arch === 'Clean+MVI' || arch === 'Clean'
     ? `\`\`\`
@@ -1088,8 +1180,8 @@ ${pkgName}/
 
   const adr001 = `### ADR-001 — Layer Structure and Dependency Rule
 - **Date**: ${today}
-- **Decision**: Adopt ${arch || 'MVVM'} with strict unidirectional dependency flow.
-- **Reason**: Enforces separation of concerns, testability, and prevents coupling between layers.
+- **Decision**: Adopt ${arch || 'MVVM'} with strict unidirectional dependency flow.${archDetected ? '' : unverified('MVVM')}
+- **Reason**: [Describe why this architecture was chosen — e.g. team familiarity, testability requirements, existing codebase conventions]
 - **Consequence**: Every new file must be placed in the correct layer package. PRs that violate the dependency rule are rejected.
 
 #### Package Tree
@@ -1109,7 +1201,7 @@ ${violationExamples}`;
   if (arch === 'Clean+MVI' || arch === 'MVI') {
     adr002 = `### ADR-002 — MVI Pattern: UiState + Intent + ViewModel + Screen
 - **Date**: ${today}
-- **Decision**: All feature screens follow the MVI contract below. No exceptions.
+- **Decision**: All feature screens follow the MVI contract below.${archDetected ? '' : unverified('Clean+MVI')}
 - **Reason**: Unidirectional data flow makes state mutations predictable and testable.
 - **Consequence**: Every screen ships with a \`UiState\`, a sealed \`Intent\`, a \`ViewModel\`, and a stateless \`Screen\` composable.
 
@@ -1166,7 +1258,7 @@ fun ExampleScreen(
   } else if (arch === 'MVVM') {
     adr002 = `### ADR-002 — MVVM Pattern: UiState + ViewModel + Screen
 - **Date**: ${today}
-- **Decision**: All feature screens follow the MVVM contract below. No exceptions.
+- **Decision**: All feature screens follow the MVVM contract below.${archDetected ? '' : unverified('MVVM')}
 - **Reason**: Clear separation between UI and business logic; ViewModel survives configuration changes.
 - **Consequence**: Every screen ships with a \`UiState\`, a \`ViewModel\`, and a stateless \`Screen\` composable.
 
@@ -1215,7 +1307,7 @@ fun ExampleScreen(
   if (diName === 'Hilt') {
     adr003 = `### ADR-003 — Dependency Injection with Hilt
 - **Date**: ${today}
-- **Decision**: Hilt is the sole DI framework. No manual \`object\` singletons or service locators.
+- **Decision**: Hilt is the sole DI framework. No manual \`object\` singletons or service locators.${diDetected ? '' : unverified('Hilt')}
 - **Reason**: Hilt provides compile-time validation, scoped components, and first-class ViewModel injection.
 - **Consequence**: Every dependency must be provided through a \`@Module\`. Direct instantiation of injected types is forbidden.
 
@@ -1251,7 +1343,7 @@ abstract class RepositoryModule {
   } else if (diName === 'Koin') {
     adr003 = `### ADR-003 — Dependency Injection with Koin
 - **Date**: ${today}
-- **Decision**: Koin is the sole DI framework. No manual singletons or service locators.
+- **Decision**: Koin is the sole DI framework. No manual singletons or service locators.${diDetected ? '' : unverified('Koin')}
 - **Reason**: Koin provides lightweight runtime DI with a Kotlin-first DSL.
 - **Consequence**: All modules declared in the \`di/\` package and loaded at \`Application.onCreate\`.
 
@@ -1505,7 +1597,7 @@ ${arch === 'Clean+MVI' ? 'Clean Architecture + MVI\nUI → ViewModel (MVI: inten
   'Clean Architecture + MVI\nUI → ViewModel → UseCase → Repository → DataSource'}
 
 ### DI
-${di || 'Hilt'} everywhere. No manual wiring.
+${di || 'Hilt'} everywhere. No manual wiring.${diDetected ? '' : unverified('Hilt')}
 
 ### Async
 Kotlin Coroutines + Flow everywhere.${hasRx ? ' RxJava being removed incrementally.' : ''}
@@ -1541,6 +1633,8 @@ ${migrationSection}
 function buildConventionsScreen(fp) {
   fp.innerHTML += `
   <div class="step-screen" id="screen-conventions">
+
+    <div id="ci-drift-banner" style="display:none" class="form-section" style="background:var(--warning-bg,#fff8e1);border-left:4px solid var(--warning,#f59e0b);padding:12px 16px;border-radius:6px;margin-bottom:16px"></div>
 
     <div class="form-section">
       <h3>Package Name Prefix ${infoBtn('Used to fill in the package structure example in the generated CONVENTIONS.md.<br><br>e.g. if your app root package is <code>com.example.app</code>, enter that here. It replaces the placeholder in the feature module path: <code>com.example.app.feature.[name]/ui/...</code>')}</h3>
@@ -1702,6 +1796,104 @@ function buildConventionsScreen(fp) {
     </div>
   </div>`;
 }
+
+// ── CI Drift scanner ───────────────────────────────────────────────────────
+// Reads .github/workflows/*.yml, fastlane/Fastfile, and bitrise.yml.
+// Returns an array of drift warnings: { field, ciValue, specValue, file }.
+async function scanCIDrift() {
+  if (!state.dirHandle) return [];
+  const drifts = [];
+
+  // ── Collect CI file texts ──────────────────────────────────────────────
+  const ciFiles = {};   // filename → text
+
+  // .github/workflows/*.yml
+  try {
+    const ghDir = await state.dirHandle.getDirectoryHandle('.github');
+    const wfDir = await ghDir.getDirectoryHandle('workflows');
+    for await (const [name, handle] of wfDir) {
+      if (handle.kind === 'file' && (name.endsWith('.yml') || name.endsWith('.yaml'))) {
+        try { ciFiles[`.github/workflows/${name}`] = await (await handle.getFile()).text(); } catch {}
+      }
+    }
+  } catch {}
+
+  // fastlane/Fastfile
+  try {
+    const flDir = await state.dirHandle.getDirectoryHandle('fastlane');
+    const fh = await flDir.getFileHandle('Fastfile');
+    ciFiles['fastlane/Fastfile'] = await (await fh.getFile()).text();
+  } catch {}
+
+  // bitrise.yml
+  const bitriseText = await tryReadFile(state.dirHandle, 'bitrise.yml')
+                   ?? await tryReadFile(state.dirHandle, '.bitrise.yml');
+  if (bitriseText) ciFiles['bitrise.yml'] = bitriseText;
+
+  if (Object.keys(ciFiles).length === 0) return [];   // no CI files found
+
+  const allCIText = Object.values(ciFiles).join('\n');
+
+  // ── Read wizard-set values ─────────────────────────────────────────────
+  const specMinSdk    = document.getElementById('cfg-min-sdk')?.value.trim() || '';
+  const specTargetSdk = document.getElementById('cfg-target-sdk')?.value.trim() || '';
+
+  // ── Check 1: JDK version ──────────────────────────────────────────────
+  const jdkM = allCIText.match(/java-version:\s*['"]?(\d+)['"]?/);
+  const ciJdk = jdkM ? parseInt(jdkM[1], 10) : null;
+  // Android projects targeting API 35+ should use JDK 17+; Kotlin 2.x needs JDK 17+
+  if (ciJdk !== null && ciJdk < 17) {
+    drifts.push({
+      field: 'JDK version',
+      ciValue: `JDK ${ciJdk}`,
+      specValue: 'JDK 17+ (required for Kotlin 2.x / API 35+)',
+      file: Object.keys(ciFiles).find(f => ciFiles[f].includes(`java-version`)),
+    });
+  }
+
+  // ── Check 2: ktlint gate ──────────────────────────────────────────────
+  const convHasKtlint  = /ktlint/i.test(document.getElementById('screen-conventions')?.textContent || '');
+  const lintGateScript = (await tryReadFile(state.dirHandle, '.claude', 'hooks', 'scripts', 'lint-gate.sh')) || '';
+  const lintGateActive = /ktlint/i.test(lintGateScript);
+  const ciRunsKtlint   = /ktlint/i.test(allCIText);
+  if (lintGateActive && !ciRunsKtlint) {
+    drifts.push({
+      field: 'ktlint',
+      ciValue: 'not enforced in CI',
+      specValue: 'enforced via hook (lint-gate.sh)',
+      file: Object.keys(ciFiles)[0],
+    });
+  }
+
+  // ── Check 3: coverage gate ────────────────────────────────────────────
+  const ciHasCoverage = /koverVerify|jacocoTestCoverageVerification|coverage/i.test(allCIText);
+  const covUseKover   = /kover/i.test(allCIText);
+  const covInputEl    = document.getElementById('cov-domain');    // proxy: if coverage UI exists
+  if (covInputEl && !ciHasCoverage) {
+    drifts.push({
+      field: 'Coverage gate',
+      ciValue: 'no koverVerify / jacoco gate found in CI',
+      specValue: 'coverage thresholds set in CONVENTIONS',
+      file: Object.keys(ciFiles)[0],
+    });
+  }
+
+  // ── Check 4: minSdk in CI env vars ───────────────────────────────────
+  if (specMinSdk) {
+    const ciMinSdkM = allCIText.match(/(?:MIN_SDK|minSdk(?:Version)?)\s*[:=]\s*['"]?(\d+)['"]?/i);
+    if (ciMinSdkM && ciMinSdkM[1] !== specMinSdk) {
+      drifts.push({
+        field: 'minSdk',
+        ciValue: ciMinSdkM[1],
+        specValue: specMinSdk,
+        file: Object.keys(ciFiles).find(f => ciFiles[f].includes(ciMinSdkM[0])),
+      });
+    }
+  }
+
+  return drifts;
+}
+
 
 function generateConventionsMD() {
   const pkg       = document.getElementById('conv-package')?.value.trim() || 'com.example.myapp';
@@ -2137,30 +2329,7 @@ function buildMigrationsScreen(fp) {
 }
 
 let customRuleCounter = 0;
-function addCustomRuleRow(defaults = {}) {
-  const id = ++customRuleCounter;
-  const row = document.createElement('div');
-  row.className = 'dynamic-item'; row.id = 'custom-rule-row-' + id;
-  row.innerHTML = `
-    <button class="remove-btn" onclick="document.getElementById('custom-rule-row-${id}').remove(); updatePreview('migrations'); saveDraft()">✕</button>
-    <div class="form-row">
-      <label>Rule title</label>
-      <input type="text" id="custom-rule-title-${id}" value="${esc(defaults.title||'')}" placeholder="e.g. Glide → Coil, Custom Logger" oninput="updatePreview('migrations');saveDraft()" style="font-size:13px">
-    </div>
-    <div class="form-row">
-      <label style="align-self:flex-start;padding-top:4px">Rule body</label>
-      <textarea id="custom-rule-body-${id}" rows="4" placeholder="Describe what the agent should do when touching files that use this pattern. Use the same style as the rules above — bullet points work well." oninput="updatePreview('migrations');saveDraft()" style="font-size:12px;font-family:var(--mono);resize:vertical;width:100%">${esc(defaults.body||'')}</textarea>
-    </div>`;
-  document.getElementById('custom-rules-list').appendChild(row);
-  const countEl = document.getElementById('custom-rule-count');
-  if (countEl) { countEl.value = customRuleCounter; saveDraft(); }
-}
 
-function toggleMigScope(id) {
-  const checked = document.getElementById('mig-' + id)?.checked;
-  const row = document.getElementById('mig-scope-row-' + id);
-  if (row) row.style.display = checked ? 'block' : 'none';
-}
 
 function generateNewScreensTable() {
   const ui      = getRadio('ui')   || 'Jetpack Compose';
@@ -2572,40 +2741,6 @@ function buildDebtScreen(fp) {
 }
 
 let debtCounter = 0;
-function addDebtRow(defaults = {}) {
-  const id = ++debtCounter;
-  const num = String(id).padStart(3, '0');
-  const row = document.createElement('div');
-  row.className = 'dynamic-item'; row.id = 'debt-row-' + id;
-  row.innerHTML = `
-    <button class="remove-btn" onclick="document.getElementById('debt-row-${id}').remove(); updatePreview('debt')">✕</button>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-      <span style="font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:700">DEBT-${num}</span>
-    </div>
-    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px">
-      <div class="form-row"><label>Title</label>
-        <input type="text" class="debt-title" value="${esc(defaults.title||'')}" placeholder="LoginViewModel uses LiveData instead of StateFlow" oninput="updatePreview('debt')"></div>
-      <div class="form-row"><label>Module</label>
-        <input type="text" class="debt-module" value="${esc(defaults.module||'')}" placeholder=":feature-auth" oninput="updatePreview('debt')"></div>
-      <div class="form-row"><label>Status</label>
-        <select class="debt-status" onchange="updatePreview('debt')">
-          <option value="OPEN"${(defaults.status||'OPEN')==='OPEN'?' selected':''}>OPEN</option>
-          <option value="SCHEDULED"${defaults.status==='SCHEDULED'?' selected':''}>SCHEDULED</option>
-          <option value="RESOLVED"${defaults.status==='RESOLVED'?' selected':''}>RESOLVED</option>
-        </select></div>
-    </div>
-    <div class="form-row"><label>Location (file path)</label>
-      <input type="text" class="debt-location" placeholder="feature/auth/ui/LoginViewModel.kt" oninput="updatePreview('debt')"></div>
-    <div class="form-row"><label>Impact</label>
-      <input type="text" class="debt-impact" placeholder="Cannot use Turbine for testing. Observer lifecycle is manual." oninput="updatePreview('debt')"></div>
-    <div class="form-row"><label>Agent Rule (exact instruction)</label>
-      <input type="text" class="debt-rule" placeholder="Do not add new LiveData here. New state uses StateFlow." oninput="updatePreview('debt')"></div>
-    <div class="form-row"><label>Scheduled Ticket (if any)</label>
-      <input type="text" class="debt-ticket" placeholder="TICKET-88 or —" oninput="updatePreview('debt')"></div>
-  `;
-  document.getElementById('debt-list').appendChild(row);
-  updatePreview('debt');
-}
 
 function generateDebtMD() {
   const rows = Array.from(document.querySelectorAll('[id^="debt-row-"]'));

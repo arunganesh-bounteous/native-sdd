@@ -13,16 +13,163 @@
 // Skeleton version — stamped from agent-sdd/VERSION by generate-embedded.js.
 // The wizard writes this into agent-artifacts/.sdd-version and compares it
 // against the stored manifest to flag projects with an outdated snapshot.
-const SKELETON_VERSION = '1.2';
+const SKELETON_VERSION = '1.4';
 // What's-new notes per version, parsed from agent-sdd/CHANGELOG.md.
 // The wizard shows the relevant entries in the "Update available" banner.
 // Platform modules — embedded by generate-embedded.js so choosePlatform() can
 // inject them as inline <script> blocks instead of loading via script.src.
 // Inline injection is required for file:// origins (Chrome blocks external loads).
+const EMBEDDED_PLATFORM_COMMON = `// platform-common.js — shared helpers used by both platform-android.js and platform-ios.js.
+// Embedded into wizard-core.js as EMBEDDED_PLATFORM_COMMON by generate-embedded.js and
+// injected into the page BEFORE the platform-specific module so all platforms can call these.
+//
+// Rules for adding functions here:
+//   ✅ Genuinely platform-agnostic (no android/ios-specific logic)
+//   ✅ Body is identical in both platform files (verified by generate-embedded.js tests)
+//   ❌ Never add platform-specific UI strings, SDK names, or tech-stack terms
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+
+function toggleMigScope(id) {
+  const checked = document.getElementById('mig-' + id)?.checked;
+  const row     = document.getElementById('mig-scope-row-' + id);
+  if (row) row.style.display = checked ? 'block' : 'none';
+}
+
+// ── Architecture step helpers ─────────────────────────────────────────────────
+
+function getApproachRows(group) {
+  const rows = [];
+  document.querySelectorAll(\`#arch-\${group}-detail .approach-card\`).forEach(card => {
+    const approach = card.dataset.approach || '';
+    const note     = (card.querySelector('textarea')?.value || '').trim();
+    rows.push({ approach, note });
+  });
+  return rows;
+}
+
+// Apply values parsed from an existing ARCHITECTURE.md back into wizard UI.
+// Only overrides fields that are explicitly present in \`parsed\` — no blanket resets.
+function applyArchitectureMD(parsed) {
+  if (parsed.arch) selectPill('arch', parsed.arch, 'radio');
+  if (parsed.di)   selectPill('di', parsed.di, 'radio');
+  if (parsed.ui)   selectPill('ui', parsed.ui, 'radio');
+  if (parsed.nav)  selectPill('nav', parsed.nav, 'radio');
+  if (parsed.asyncLibs) parsed.asyncLibs.forEach(v => selectPill('async', v, 'check'));
+}
+
+// ── Form helpers ───────────────────────────────────────────────────────────────
+
+function setSelectOption(id, value) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  for (const opt of el.options) {
+    if (opt.value === value || opt.text === value) { el.value = opt.value; return; }
+  }
+}
+
+// ── Markdown parsers ──────────────────────────────────────────────────────────
+
+// Parse the _index.md keyword→module mapping table back into a map.
+function parseIndexKeywords(text) {
+  const map = {};
+  for (const line of text.split('\\n')) {
+    const m = line.match(/^\\|\\s*(.+?)\\s*\\|\\s*(.+?)\\s*\\|\\s*(.+?)\\s*\\|/);
+    if (!m) continue;
+    const keywords = m[1].trim();
+    const name     = m[2].trim();
+    if (!name || /^-+$/.test(name) || name.toLowerCase() === 'module') continue;
+    map[name.toLowerCase()] = keywords;
+  }
+  return map;
+}
+
+// ── Dynamic row builders ──────────────────────────────────────────────────────
+
+function addCustomRuleRow(defaults = {}) {
+  const id = ++customRuleCounter;
+  const row = document.createElement('div');
+  row.className = 'dynamic-item'; row.id = 'custom-rule-row-' + id;
+  row.innerHTML = \`
+    <button class="remove-btn" onclick="document.getElementById('custom-rule-row-\${id}').remove(); updatePreview('migrations'); saveDraft()">✕</button>
+    <div class="form-row">
+      <label>Rule title</label>
+      <input type="text" id="custom-rule-title-\${id}" value="\${esc(defaults.title||'')}" placeholder="e.g. Glide → Coil, Custom Logger" oninput="updatePreview('migrations');saveDraft()" style="font-size:13px">
+    </div>
+    <div class="form-row">
+      <label style="align-self:flex-start;padding-top:4px">Rule body</label>
+      <textarea id="custom-rule-body-\${id}" rows="4" placeholder="Describe what the agent should do when touching files that use this pattern. Use the same style as the rules above — bullet points work well." oninput="updatePreview('migrations');saveDraft()" style="font-size:12px;font-family:var(--mono);resize:vertical;width:100%">\${esc(defaults.body||'')}</textarea>
+    </div>\`;
+  document.getElementById('custom-rules-list').appendChild(row);
+  const countEl = document.getElementById('custom-rule-count');
+  if (countEl) { countEl.value = customRuleCounter; saveDraft(); }
+}
+
+function addDebtRow(defaults = {}) {
+  const id = ++debtCounter;
+  const num = String(id).padStart(3, '0');
+  const row = document.createElement('div');
+  row.className = 'dynamic-item'; row.id = 'debt-row-' + id;
+  row.innerHTML = \`
+    <button class="remove-btn" onclick="document.getElementById('debt-row-\${id}').remove(); updatePreview('debt')">✕</button>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+      <span style="font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:700">DEBT-\${num}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px">
+      <div class="form-row"><label>Title</label>
+        <input type="text" class="debt-title" value="\${esc(defaults.title||'')}" placeholder="LoginViewModel uses LiveData instead of StateFlow" oninput="updatePreview('debt')"></div>
+      <div class="form-row"><label>Module</label>
+        <input type="text" class="debt-module" value="\${esc(defaults.module||'')}" placeholder=":feature-auth" oninput="updatePreview('debt')"></div>
+      <div class="form-row"><label>Status</label>
+        <select class="debt-status" onchange="updatePreview('debt')">
+          <option value="OPEN"\${(defaults.status||'OPEN')==='OPEN'?' selected':''}>OPEN</option>
+          <option value="SCHEDULED"\${defaults.status==='SCHEDULED'?' selected':''}>SCHEDULED</option>
+          <option value="RESOLVED"\${defaults.status==='RESOLVED'?' selected':''}>RESOLVED</option>
+        </select></div>
+    </div>
+    <div class="form-row"><label>Location (file path)</label>
+      <input type="text" class="debt-location" placeholder="feature/auth/ui/LoginViewModel.kt" oninput="updatePreview('debt')"></div>
+    <div class="form-row"><label>Impact</label>
+      <input type="text" class="debt-impact" placeholder="Cannot use Turbine for testing. Observer lifecycle is manual." oninput="updatePreview('debt')"></div>
+    <div class="form-row"><label>Agent Rule (exact instruction)</label>
+      <input type="text" class="debt-rule" placeholder="Do not add new LiveData here. New state uses StateFlow." oninput="updatePreview('debt')"></div>
+    <div class="form-row"><label>Scheduled Ticket (if any)</label>
+      <input type="text" class="debt-ticket" placeholder="TICKET-88 or —" oninput="updatePreview('debt')"></div>
+  \`;
+  document.getElementById('debt-list').appendChild(row);
+  updatePreview('debt');
+}
+
+// ── CI Drift ──────────────────────────────────────────────────────────────────
+
+// Render the CI drift warning banner on the Conventions step.
+// Called from platform-specific scanCIDrift() and from _goTo('conventions').
+function renderCIDriftBanner(drifts) {
+  const banner = document.getElementById('ci-drift-banner');
+  if (!banner) return;
+  if (!drifts || drifts.length === 0) { banner.style.display = 'none'; return; }
+
+  const rows = drifts.map(d =>
+    \`<li style="margin:4px 0"><strong>\${d.field}</strong>: \` +
+    \`CI has <code>\${d.ciValue}</code> but CONVENTIONS expects <code>\${d.specValue}</code>\` +
+    (d.file ? \` <span style="color:var(--text-muted);font-size:0.85em">(\${d.file})</span>\` : '') +
+    \`</li>\`
+  ).join('');
+
+  banner.innerHTML =
+    \`<strong>⚠️ CI Drift detected</strong> — the following settings in your CI config \` +
+    \`differ from what this wizard will write to CONVENTIONS.md. Align them before committing.<ul style="margin:8px 0 0 0;padding-left:20px">\${rows}</ul>\`;
+  banner.style.display = 'block';
+}
+`;
+
 const EMBEDDED_PLATFORM_ANDROID = `// ══════════════════════════════════════════════════════
 //  platform-android.js
 //  Android-specific code for the SDD Setup Wizard.
-//  Loaded before wizard-core.js.
+//  Loaded after platform-common.js and before wizard-core.js.
+//  Requires platform-common.js: renderCIDriftBanner, setSelectOption,
+//  applyArchitectureMD, parseIndexKeywords, addCustomRuleRow,
+//  addDebtRow, toggleMigScope, getApproachRows
 //  Requires wizard-core.js globals: state, getPills, getRadio,
 //  getDraftField, selectPill, pill, tierBadge, infoBtn, esc,
 //  updatePreview, saveFile, showToast, tryReadFile, countSourceFiles
@@ -96,6 +243,15 @@ function updateArchProgress() {
 }
 
 // Inserts a module name at the cursor position of a textarea.
+// Creates a module chip using DOM APIs — safe against names containing special chars.
+function makeModuleChip(targetId, moduleName) {
+  const span = document.createElement('span');
+  span.className = 'mod-chip';
+  span.textContent = moduleName;
+  span.addEventListener('click', () => insertModuleChip(targetId, moduleName));
+  return span;
+}
+
 // Auto-prefixes ", " when the cursor follows non-whitespace text on the same line,
 // so chips never run directly into adjacent words.
 function insertModuleChip(targetId, name) {
@@ -122,11 +278,12 @@ function refreshModuleChips() {
   // Static chip containers (storage, etc.)
   document.querySelectorAll('.module-chips[data-target]').forEach(container => {
     const targetId = container.dataset.target;
-    container.innerHTML =
-      \`<div class="module-chips-title">Modules</div>\` +
-      modules.map(m =>
-        \`<span class="mod-chip" onclick="insertModuleChip('\${targetId}','\${m.name}')">\${m.name}</span>\`
-      ).join('');
+    container.textContent = '';
+    const title = document.createElement('div');
+    title.className = 'module-chips-title';
+    title.textContent = 'Modules';
+    container.appendChild(title);
+    modules.forEach(m => container.appendChild(makeModuleChip(targetId, m.name)));
   });
   // Dynamic per-approach cards (async / state)
   document.querySelectorAll('.approach-card .module-chips[data-target]').forEach(container => {
@@ -139,11 +296,12 @@ function populateApproachChips(container) {
   const modules = state.detectedModuleDetails;
   if (!modules || modules.length === 0) return;
   const targetId = container.dataset.target;
-  container.innerHTML =
-    \`<div class="module-chips-title">Modules</div>\` +
-    modules.map(m =>
-      \`<span class="mod-chip" onclick="insertModuleChip('\${targetId}','\${m.name}')">\${m.name}</span>\`
-    ).join('');
+  container.textContent = '';
+  const title = document.createElement('div');
+  title.className = 'module-chips-title';
+  title.textContent = 'Modules';
+  container.appendChild(title);
+  modules.forEach(m => container.appendChild(makeModuleChip(targetId, m.name)));
 }
 
 // Placeholder hints per approach value, used inside per-approach textarea.
@@ -183,36 +341,38 @@ function renderApproachRows(group) {
     if (approach && ta) saved[approach] = ta.value;
   });
 
+  // Build card HTML without injecting user-supplied values into innerHTML.
+  // Saved textarea values are applied via .value after insertion (XSS-safe).
   container.innerHTML = selected.map(approach => {
     const taId = \`approach-\${group}-\${approach}\`;
     const ph   = notes[approach] || 'describe which modules use this approach';
-    // Prefer current DOM value, then localStorage draft, then empty.
-    const val  = saved[approach] ?? getDraftField(taId);
-    return \`<div class="approach-card" data-approach="\${approach}">
-      <div class="approach-card-label">\${approach}</div>
-      <textarea id="\${taId}" rows="2"
-        placeholder="\${ph}"
-        oninput="updatePreview('architecture'); updateArchProgress()">\${val}</textarea>
+    return \`<div class="approach-card" data-approach="\${esc(approach)}">
+      <div class="approach-card-label">\${esc(approach)}</div>
+      <textarea id="\${esc(taId)}" rows="2"
+        placeholder="\${esc(ph)}"
+        oninput="updatePreview('architecture'); updateArchProgress()"></textarea>
       <div class="module-chips-wrapper">
-        <div class="module-chips" data-target="\${taId}"></div>
+        <div class="module-chips" data-target="\${esc(taId)}"></div>
       </div>
     </div>\`;
   }).join('');
+
+  // Restore saved values via .value — never via innerHTML — so no content can
+  // break out of the textarea or execute as markup.
+  container.querySelectorAll('.approach-card').forEach(card => {
+    const approach = card.dataset.approach;
+    const ta = card.querySelector('textarea');
+    if (approach && ta) {
+      const val = saved[approach] ?? getDraftField(\`approach-\${group}-\${approach}\`);
+      if (val) ta.value = val;
+    }
+  });
 
   // Populate chips in the newly rendered cards.
   container.querySelectorAll('.approach-card .module-chips[data-target]').forEach(c => populateApproachChips(c));
 }
 
 // Reads all approach-card textareas for a group → array of {approach, note} pairs.
-function getApproachRows(group) {
-  const rows = [];
-  document.querySelectorAll(\`#arch-\${group}-detail .approach-card\`).forEach(card => {
-    const approach = card.dataset.approach || '';
-    const note = (card.querySelector('textarea')?.value || '').trim();
-    rows.push({ approach, note });
-  });
-  return rows;
-}
 
 // ── Parse existing DATA_MODEL.md → entity + endpoint row objects ──
 function parseDataModelMD(text) {
@@ -265,18 +425,6 @@ function parseDataModelMD(text) {
 // Keywords are the single source of truth in _index.md (not MODULE_MAP). When
 // reloading a project we backfill them onto the module rows so re-saving the
 // wizard regenerates _index.md correctly instead of wiping the routing table.
-function parseIndexKeywords(text) {
-  const map = {};
-  for (const line of text.split('\\n')) {
-    const m = line.match(/^\\|\\s*(.+?)\\s*\\|\\s*(.+?)\\s*\\|\\s*(.+?)\\s*\\|/);
-    if (!m) continue;
-    const keywords = m[1].trim();
-    const name     = m[2].trim();
-    if (!name || /^-+$/.test(name) || name.toLowerCase() === 'module') continue; // header/separator
-    map[name.toLowerCase()] = keywords;
-  }
-  return map;
-}
 
 // ── Parse existing MODULE_MAP.md → module row objects ────
 function parseModuleMapMD(text) {
@@ -365,7 +513,7 @@ async function analyzeProject() {
   let appGradle = await tryReadFile(state.dirHandle, 'app', 'build.gradle')
                ?? await tryReadFile(state.dirHandle, 'app', 'build.gradle.kts');
   if (!appGradle && settings) {
-    const moduleNames = [...settings.matchAll(/include\\s*['"]:?([\\w\\-]+)['"]/g)].map(m => m[1]);
+    const moduleNames = [...settings.matchAll(/["']:?([\\w\\-]+)['"]/g)].map(m => m[1]);
     for (const mod of moduleNames) {
       if (mod === 'app') continue; // already tried
       const candidate = await tryReadFile(state.dirHandle, mod, 'build.gradle')
@@ -398,9 +546,18 @@ async function analyzeProject() {
                  : has('squareup.picasso') ? 'Picasso'
                  : has('bumptech.glide', '"glide"') ? 'Glide' : '';
 
-  // Extract module names from settings.gradle
-  const moduleNames = [...((settings || '').matchAll(/include\\s*[\\(]?\\s*["':]([\\w\\-:]+)["']/g))]
-    .map(m => (m[1].startsWith(':') ? m[1] : ':' + m[1]));
+  // Extract module names from settings.gradle.
+  // Handles both single-arg and multi-arg include() forms, e.g.:
+  //   include ':app', ':core', ':feature-home'          (Groovy)
+  //   include(":app", ":core", ":feature-home")         (Groovy / KTS)
+  //   include(":app")                                   (KTS single)
+  const moduleNames = [];
+  for (const lineMatch of ((settings || '').matchAll(/include\\s*[\\(]?([^)\\n]+)[\\)]?/g))) {
+    for (const argMatch of lineMatch[1].matchAll(/["']:?([\\w\\-:]+)["']/g)) {
+      const name = argMatch[1].startsWith(':') ? argMatch[1] : ':' + argMatch[1];
+      if (!moduleNames.includes(name)) moduleNames.push(name);
+    }
+  }
 
   // ── Extract Project Config fields (preserve case — do not use lowercased gradle) ──
   const appIdMatch    = (appGradle || '').match(/\\bapplicationId\\b\\s*=?\\s*["']([^"']+)["']/);
@@ -535,6 +692,16 @@ async function analyzeProject() {
     if (entList && entities.length > 0) { entList.innerHTML = ''; entityCounter = 0; entities.forEach(e => addEntityRow(e)); }
   }
 
+  // ── Round-trip: reload ARCHITECTURE.md if it already exists ──────────────
+  // Do this AFTER Gradle-based detection so human edits take priority over
+  // auto-detected defaults. Only the fields present in the file are overwritten.
+  const existingArch = await tryReadFile(state.dirHandle, 'agent-artifacts', 'spec-kit', 'ARCHITECTURE.md');
+  if (existingArch) {
+    const parsed = parseArchitectureMD(existingArch);
+    applyArchitectureMD(parsed);
+    state.archRoundTripped = true;
+  }
+
   // ── Scan for OkHttp Interceptors ─────────────────────
   state.detectedInterceptors = await scanForInterceptors(state.dirHandle);
 
@@ -573,16 +740,77 @@ async function analyzeProject() {
   const moduleSource = parsedModules.length > 0
     ? \`\${parsedModules.length} modules loaded from MODULE_MAP.md\`
     : \`\${moduleNames.length} modules detected from Gradle\`;
-  showToast(\`Auto-filled · \${moduleSource}, \${state.detectedInterceptors.length} interceptors · review & adjust\`, 'success');
+  const archNote = state.archRoundTripped ? ', ARCHITECTURE.md reloaded' : '';
+  showToast(\`Auto-filled · \${moduleSource}, \${state.detectedInterceptors.length} interceptors\${archNote} · review & adjust\`, 'success');
+
+  // Run CI drift scan in background — populates banner when conventions step is viewed
+  scanCIDrift().then(drifts => {
+    state.ciDrift = drifts;
+    renderCIDriftBanner(drifts);
+    if (drifts.length > 0) {
+      showToast(\`⚠️ \${drifts.length} CI drift issue\${drifts.length > 1 ? 's' : ''} found — check Conventions step\`, 'warning');
+    }
+  });
 }
 
-function setSelectOption(id, value) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  for (const opt of el.options) {
-    if (opt.value === value || opt.text === value) { el.value = opt.value; return; }
+// ── Round-trip: parse a previously generated ARCHITECTURE.md back into wizard UI ──
+// Returns an object with the values it could confidently extract.
+function parseArchitectureMD(text) {
+  const result = {};
+
+  // ADR-001 — arch pattern
+  // Line: "- **Decision**: Adopt Clean+MVI with strict ..."
+  const archM = text.match(/ADR-001[\\s\\S]*?Decision\\*\\*:\\s*Adopt\\s+([\\w+]+)\\s+with/);
+  if (archM) result.arch = archM[1];
+
+  // ADR-002 — confirm pattern from heading (more reliable than decision text)
+  if (!result.arch) {
+    if (/ADR-002 — MVI Pattern/.test(text))  result.arch = 'Clean+MVI';
+    else if (/ADR-002 — MVVM Pattern/.test(text)) result.arch = 'MVVM';
   }
+
+  // ADR-003 — DI framework
+  const diM = text.match(/ADR-003[\\s\\S]*?Decision\\*\\*:\\s*(Hilt|Koin|Dagger)\\s+is the sole DI/);
+  if (diM) result.di = diM[1];
+  if (!result.di && /ADR-003 — Dependency Injection \\(Manual/.test(text)) result.di = 'Manual';
+
+  // ADR-004 — Navigation (heading is reliable)
+  if (/ADR-004 — Navigation with NavigationStack/.test(text))       result.nav = 'NavigationStack';
+  else if (/ADR-004 — Navigation with Jetpack Compose/.test(text))  result.nav = 'ComposeNav';
+  else if (/ADR-004 — Navigation with Jetpack Navigation Component/.test(text)) result.nav = 'JetpackNav';
+
+  // CONVENTIONS — UI framework (### UI section)
+  const uiM = text.match(/### UI\\n([\\s\\S]*?)(?=\\n###|\\n---|\\n##|$)/);
+  if (uiM) {
+    const uiBlock = uiM[1];
+    if (/Compose.*Material 3/i.test(uiBlock) && /Existing XML/i.test(uiBlock)) result.ui = 'Mixed';
+    else if (/Jetpack Compose.*Material 3/i.test(uiBlock)) result.ui = 'Compose';
+    else if (/XML layout/i.test(uiBlock)) result.ui = 'XML';
+  }
+
+  // CONVENTIONS — Async (### Async section)
+  if (/Kotlin Coroutines/.test(text)) result.asyncLibs = ['Coroutines'];
+  if (/\\+ Flow/.test(text))           (result.asyncLibs = result.asyncLibs || []).includes('Flow') || result.asyncLibs.push('Flow');
+  if (/RxJava/.test(text))            (result.asyncLibs = result.asyncLibs || []).includes('RxJava3') || result.asyncLibs.push('RxJava3');
+
+  // CONVENTIONS — DI section fallback
+  if (!result.di) {
+    const diM2 = text.match(/### DI\\n([^\\n]+)/);
+    if (diM2) {
+      const line = diM2[1].trim();
+      if (line.startsWith('Hilt'))  result.di = 'Hilt';
+      else if (line.startsWith('Koin'))   result.di = 'Koin';
+      else if (line.startsWith('Dagger')) result.di = 'Dagger';
+      else if (line.startsWith('Manual')) result.di = 'Manual';
+    }
+  }
+
+  return result;
 }
+
+// Apply parsed ARCHITECTURE.md values into wizard UI — only overrides values
+// that are explicitly present in the parsed result (no blanket resets).
+
 
 function guessModuleKeywords(moduleName) {
   const name = moduleName.replace(/^:/, '').replace(/[-:]/g, ' ').toLowerCase();
@@ -1066,6 +1294,14 @@ function generateArchitectureMD() {
 
   // ── ADR helpers ──────────────────────────────────────────────────────────
 
+  // Confidence helpers — used throughout the generated markdown.
+  // When a value was auto-detected from source files it can be stated confidently.
+  // When it fell back to a default (detection found nothing) we flag it for human review.
+  const archDetected = !!arch;
+  const diDetected   = !!di;
+  const unverified   = (name) =>
+    \`\\n  > ⚠️ [auto-detected: \${name} — verify this matches your codebase before treating it as final]\`;
+
   // ADR-001: Layer Structure
   const layerPackageTree = arch === 'Clean+MVI' || arch === 'Clean'
     ? \`\\\`\\\`\\\`
@@ -1109,8 +1345,8 @@ function generateArchitectureMD() {
 
   const adr001 = \`### ADR-001 — Layer Structure and Dependency Rule
 - **Date**: \${today}
-- **Decision**: Adopt \${arch || 'MVVM'} with strict unidirectional dependency flow.
-- **Reason**: Enforces separation of concerns, testability, and prevents coupling between layers.
+- **Decision**: Adopt \${arch || 'MVVM'} with strict unidirectional dependency flow.\${archDetected ? '' : unverified('MVVM')}
+- **Reason**: [Describe why this architecture was chosen — e.g. team familiarity, testability requirements, existing codebase conventions]
 - **Consequence**: Every new file must be placed in the correct layer package. PRs that violate the dependency rule are rejected.
 
 #### Package Tree
@@ -1130,7 +1366,7 @@ function generateArchitectureMD() {
   if (arch === 'Clean+MVI' || arch === 'MVI') {
     adr002 = \`### ADR-002 — MVI Pattern: UiState + Intent + ViewModel + Screen
 - **Date**: \${today}
-- **Decision**: All feature screens follow the MVI contract below. No exceptions.
+- **Decision**: All feature screens follow the MVI contract below.\${archDetected ? '' : unverified('Clean+MVI')}
 - **Reason**: Unidirectional data flow makes state mutations predictable and testable.
 - **Consequence**: Every screen ships with a \\\`UiState\\\`, a sealed \\\`Intent\\\`, a \\\`ViewModel\\\`, and a stateless \\\`Screen\\\` composable.
 
@@ -1187,7 +1423,7 @@ fun ExampleScreen(
   } else if (arch === 'MVVM') {
     adr002 = \`### ADR-002 — MVVM Pattern: UiState + ViewModel + Screen
 - **Date**: \${today}
-- **Decision**: All feature screens follow the MVVM contract below. No exceptions.
+- **Decision**: All feature screens follow the MVVM contract below.\${archDetected ? '' : unverified('MVVM')}
 - **Reason**: Clear separation between UI and business logic; ViewModel survives configuration changes.
 - **Consequence**: Every screen ships with a \\\`UiState\\\`, a \\\`ViewModel\\\`, and a stateless \\\`Screen\\\` composable.
 
@@ -1236,7 +1472,7 @@ fun ExampleScreen(
   if (diName === 'Hilt') {
     adr003 = \`### ADR-003 — Dependency Injection with Hilt
 - **Date**: \${today}
-- **Decision**: Hilt is the sole DI framework. No manual \\\`object\\\` singletons or service locators.
+- **Decision**: Hilt is the sole DI framework. No manual \\\`object\\\` singletons or service locators.\${diDetected ? '' : unverified('Hilt')}
 - **Reason**: Hilt provides compile-time validation, scoped components, and first-class ViewModel injection.
 - **Consequence**: Every dependency must be provided through a \\\`@Module\\\`. Direct instantiation of injected types is forbidden.
 
@@ -1272,7 +1508,7 @@ abstract class RepositoryModule {
   } else if (diName === 'Koin') {
     adr003 = \`### ADR-003 — Dependency Injection with Koin
 - **Date**: \${today}
-- **Decision**: Koin is the sole DI framework. No manual singletons or service locators.
+- **Decision**: Koin is the sole DI framework. No manual singletons or service locators.\${diDetected ? '' : unverified('Koin')}
 - **Reason**: Koin provides lightweight runtime DI with a Kotlin-first DSL.
 - **Consequence**: All modules declared in the \\\`di/\\\` package and loaded at \\\`Application.onCreate\\\`.
 
@@ -1526,7 +1762,7 @@ findNavController().navigate(action)
   'Clean Architecture + MVI\\nUI → ViewModel → UseCase → Repository → DataSource'}
 
 ### DI
-\${di || 'Hilt'} everywhere. No manual wiring.
+\${di || 'Hilt'} everywhere. No manual wiring.\${diDetected ? '' : unverified('Hilt')}
 
 ### Async
 Kotlin Coroutines + Flow everywhere.\${hasRx ? ' RxJava being removed incrementally.' : ''}
@@ -1562,6 +1798,8 @@ Kotlin Coroutines + Flow everywhere.\${hasRx ? ' RxJava being removed incrementa
 function buildConventionsScreen(fp) {
   fp.innerHTML += \`
   <div class="step-screen" id="screen-conventions">
+
+    <div id="ci-drift-banner" style="display:none" class="form-section" style="background:var(--warning-bg,#fff8e1);border-left:4px solid var(--warning,#f59e0b);padding:12px 16px;border-radius:6px;margin-bottom:16px"></div>
 
     <div class="form-section">
       <h3>Package Name Prefix \${infoBtn('Used to fill in the package structure example in the generated CONVENTIONS.md.<br><br>e.g. if your app root package is <code>com.example.app</code>, enter that here. It replaces the placeholder in the feature module path: <code>com.example.app.feature.[name]/ui/...</code>')}</h3>
@@ -1723,6 +1961,104 @@ function buildConventionsScreen(fp) {
     </div>
   </div>\`;
 }
+
+// ── CI Drift scanner ───────────────────────────────────────────────────────
+// Reads .github/workflows/*.yml, fastlane/Fastfile, and bitrise.yml.
+// Returns an array of drift warnings: { field, ciValue, specValue, file }.
+async function scanCIDrift() {
+  if (!state.dirHandle) return [];
+  const drifts = [];
+
+  // ── Collect CI file texts ──────────────────────────────────────────────
+  const ciFiles = {};   // filename → text
+
+  // .github/workflows/*.yml
+  try {
+    const ghDir = await state.dirHandle.getDirectoryHandle('.github');
+    const wfDir = await ghDir.getDirectoryHandle('workflows');
+    for await (const [name, handle] of wfDir) {
+      if (handle.kind === 'file' && (name.endsWith('.yml') || name.endsWith('.yaml'))) {
+        try { ciFiles[\`.github/workflows/\${name}\`] = await (await handle.getFile()).text(); } catch {}
+      }
+    }
+  } catch {}
+
+  // fastlane/Fastfile
+  try {
+    const flDir = await state.dirHandle.getDirectoryHandle('fastlane');
+    const fh = await flDir.getFileHandle('Fastfile');
+    ciFiles['fastlane/Fastfile'] = await (await fh.getFile()).text();
+  } catch {}
+
+  // bitrise.yml
+  const bitriseText = await tryReadFile(state.dirHandle, 'bitrise.yml')
+                   ?? await tryReadFile(state.dirHandle, '.bitrise.yml');
+  if (bitriseText) ciFiles['bitrise.yml'] = bitriseText;
+
+  if (Object.keys(ciFiles).length === 0) return [];   // no CI files found
+
+  const allCIText = Object.values(ciFiles).join('\\n');
+
+  // ── Read wizard-set values ─────────────────────────────────────────────
+  const specMinSdk    = document.getElementById('cfg-min-sdk')?.value.trim() || '';
+  const specTargetSdk = document.getElementById('cfg-target-sdk')?.value.trim() || '';
+
+  // ── Check 1: JDK version ──────────────────────────────────────────────
+  const jdkM = allCIText.match(/java-version:\\s*['"]?(\\d+)['"]?/);
+  const ciJdk = jdkM ? parseInt(jdkM[1], 10) : null;
+  // Android projects targeting API 35+ should use JDK 17+; Kotlin 2.x needs JDK 17+
+  if (ciJdk !== null && ciJdk < 17) {
+    drifts.push({
+      field: 'JDK version',
+      ciValue: \`JDK \${ciJdk}\`,
+      specValue: 'JDK 17+ (required for Kotlin 2.x / API 35+)',
+      file: Object.keys(ciFiles).find(f => ciFiles[f].includes(\`java-version\`)),
+    });
+  }
+
+  // ── Check 2: ktlint gate ──────────────────────────────────────────────
+  const convHasKtlint  = /ktlint/i.test(document.getElementById('screen-conventions')?.textContent || '');
+  const lintGateScript = (await tryReadFile(state.dirHandle, '.claude', 'hooks', 'scripts', 'lint-gate.sh')) || '';
+  const lintGateActive = /ktlint/i.test(lintGateScript);
+  const ciRunsKtlint   = /ktlint/i.test(allCIText);
+  if (lintGateActive && !ciRunsKtlint) {
+    drifts.push({
+      field: 'ktlint',
+      ciValue: 'not enforced in CI',
+      specValue: 'enforced via hook (lint-gate.sh)',
+      file: Object.keys(ciFiles)[0],
+    });
+  }
+
+  // ── Check 3: coverage gate ────────────────────────────────────────────
+  const ciHasCoverage = /koverVerify|jacocoTestCoverageVerification|coverage/i.test(allCIText);
+  const covUseKover   = /kover/i.test(allCIText);
+  const covInputEl    = document.getElementById('cov-domain');    // proxy: if coverage UI exists
+  if (covInputEl && !ciHasCoverage) {
+    drifts.push({
+      field: 'Coverage gate',
+      ciValue: 'no koverVerify / jacoco gate found in CI',
+      specValue: 'coverage thresholds set in CONVENTIONS',
+      file: Object.keys(ciFiles)[0],
+    });
+  }
+
+  // ── Check 4: minSdk in CI env vars ───────────────────────────────────
+  if (specMinSdk) {
+    const ciMinSdkM = allCIText.match(/(?:MIN_SDK|minSdk(?:Version)?)\\s*[:=]\\s*['"]?(\\d+)['"]?/i);
+    if (ciMinSdkM && ciMinSdkM[1] !== specMinSdk) {
+      drifts.push({
+        field: 'minSdk',
+        ciValue: ciMinSdkM[1],
+        specValue: specMinSdk,
+        file: Object.keys(ciFiles).find(f => ciFiles[f].includes(ciMinSdkM[0])),
+      });
+    }
+  }
+
+  return drifts;
+}
+
 
 function generateConventionsMD() {
   const pkg       = document.getElementById('conv-package')?.value.trim() || 'com.example.myapp';
@@ -2158,30 +2494,7 @@ function buildMigrationsScreen(fp) {
 }
 
 let customRuleCounter = 0;
-function addCustomRuleRow(defaults = {}) {
-  const id = ++customRuleCounter;
-  const row = document.createElement('div');
-  row.className = 'dynamic-item'; row.id = 'custom-rule-row-' + id;
-  row.innerHTML = \`
-    <button class="remove-btn" onclick="document.getElementById('custom-rule-row-\${id}').remove(); updatePreview('migrations'); saveDraft()">✕</button>
-    <div class="form-row">
-      <label>Rule title</label>
-      <input type="text" id="custom-rule-title-\${id}" value="\${esc(defaults.title||'')}" placeholder="e.g. Glide → Coil, Custom Logger" oninput="updatePreview('migrations');saveDraft()" style="font-size:13px">
-    </div>
-    <div class="form-row">
-      <label style="align-self:flex-start;padding-top:4px">Rule body</label>
-      <textarea id="custom-rule-body-\${id}" rows="4" placeholder="Describe what the agent should do when touching files that use this pattern. Use the same style as the rules above — bullet points work well." oninput="updatePreview('migrations');saveDraft()" style="font-size:12px;font-family:var(--mono);resize:vertical;width:100%">\${esc(defaults.body||'')}</textarea>
-    </div>\`;
-  document.getElementById('custom-rules-list').appendChild(row);
-  const countEl = document.getElementById('custom-rule-count');
-  if (countEl) { countEl.value = customRuleCounter; saveDraft(); }
-}
 
-function toggleMigScope(id) {
-  const checked = document.getElementById('mig-' + id)?.checked;
-  const row = document.getElementById('mig-scope-row-' + id);
-  if (row) row.style.display = checked ? 'block' : 'none';
-}
 
 function generateNewScreensTable() {
   const ui      = getRadio('ui')   || 'Jetpack Compose';
@@ -2593,40 +2906,6 @@ function buildDebtScreen(fp) {
 }
 
 let debtCounter = 0;
-function addDebtRow(defaults = {}) {
-  const id = ++debtCounter;
-  const num = String(id).padStart(3, '0');
-  const row = document.createElement('div');
-  row.className = 'dynamic-item'; row.id = 'debt-row-' + id;
-  row.innerHTML = \`
-    <button class="remove-btn" onclick="document.getElementById('debt-row-\${id}').remove(); updatePreview('debt')">✕</button>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-      <span style="font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:700">DEBT-\${num}</span>
-    </div>
-    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px">
-      <div class="form-row"><label>Title</label>
-        <input type="text" class="debt-title" value="\${esc(defaults.title||'')}" placeholder="LoginViewModel uses LiveData instead of StateFlow" oninput="updatePreview('debt')"></div>
-      <div class="form-row"><label>Module</label>
-        <input type="text" class="debt-module" value="\${esc(defaults.module||'')}" placeholder=":feature-auth" oninput="updatePreview('debt')"></div>
-      <div class="form-row"><label>Status</label>
-        <select class="debt-status" onchange="updatePreview('debt')">
-          <option value="OPEN"\${(defaults.status||'OPEN')==='OPEN'?' selected':''}>OPEN</option>
-          <option value="SCHEDULED"\${defaults.status==='SCHEDULED'?' selected':''}>SCHEDULED</option>
-          <option value="RESOLVED"\${defaults.status==='RESOLVED'?' selected':''}>RESOLVED</option>
-        </select></div>
-    </div>
-    <div class="form-row"><label>Location (file path)</label>
-      <input type="text" class="debt-location" placeholder="feature/auth/ui/LoginViewModel.kt" oninput="updatePreview('debt')"></div>
-    <div class="form-row"><label>Impact</label>
-      <input type="text" class="debt-impact" placeholder="Cannot use Turbine for testing. Observer lifecycle is manual." oninput="updatePreview('debt')"></div>
-    <div class="form-row"><label>Agent Rule (exact instruction)</label>
-      <input type="text" class="debt-rule" placeholder="Do not add new LiveData here. New state uses StateFlow." oninput="updatePreview('debt')"></div>
-    <div class="form-row"><label>Scheduled Ticket (if any)</label>
-      <input type="text" class="debt-ticket" placeholder="TICKET-88 or —" oninput="updatePreview('debt')"></div>
-  \`;
-  document.getElementById('debt-list').appendChild(row);
-  updatePreview('debt');
-}
 
 function generateDebtMD() {
   const rows = Array.from(document.querySelectorAll('[id^="debt-row-"]'));
@@ -3344,7 +3623,10 @@ const PLATFORM = {
 const EMBEDDED_PLATFORM_IOS = `// ══════════════════════════════════════════════════════
 //  platform-ios.js
 //  iOS-specific code for the SDD Setup Wizard.
-//  Loaded before wizard-core.js.
+//  Loaded after platform-common.js and before wizard-core.js.
+//  Requires platform-common.js: renderCIDriftBanner, setSelectOption,
+//  applyArchitectureMD, parseIndexKeywords, addCustomRuleRow,
+//  addDebtRow, toggleMigScope, getApproachRows
 //  Requires wizard-core.js globals: state, getPills, getRadio,
 //  getDraftField, selectPill, pill, tierBadge, infoBtn, esc,
 //  updatePreview, saveFile, showToast, tryReadFile, countSourceFiles
@@ -3413,6 +3695,15 @@ function updateArchProgress() {
   }
 }
 
+// Creates a module chip using DOM APIs — safe against names containing special chars.
+function makeModuleChip(targetId, moduleName) {
+  const span = document.createElement('span');
+  span.className = 'mod-chip';
+  span.textContent = moduleName;
+  span.addEventListener('click', () => insertModuleChip(targetId, moduleName));
+  return span;
+}
+
 function insertModuleChip(targetId, name) {
   const el = document.getElementById(targetId);
   if (!el) return;
@@ -3433,11 +3724,12 @@ function refreshModuleChips() {
   if (!modules || modules.length === 0) return;
   document.querySelectorAll('.module-chips[data-target]').forEach(container => {
     const targetId = container.dataset.target;
-    container.innerHTML =
-      \`<div class="module-chips-title">Modules</div>\` +
-      modules.map(m =>
-        \`<span class="mod-chip" onclick="insertModuleChip('\${targetId}','\${m.name}')">\${m.name}</span>\`
-      ).join('');
+    container.textContent = '';
+    const title = document.createElement('div');
+    title.className = 'module-chips-title';
+    title.textContent = 'Modules';
+    container.appendChild(title);
+    modules.forEach(m => container.appendChild(makeModuleChip(targetId, m.name)));
   });
   document.querySelectorAll('.approach-card .module-chips[data-target]').forEach(container => {
     populateApproachChips(container);
@@ -3448,11 +3740,12 @@ function populateApproachChips(container) {
   const modules = state.detectedModuleDetails;
   if (!modules || modules.length === 0) return;
   const targetId = container.dataset.target;
-  container.innerHTML =
-    \`<div class="module-chips-title">Modules</div>\` +
-    modules.map(m =>
-      \`<span class="mod-chip" onclick="insertModuleChip('\${targetId}','\${m.name}')">\${m.name}</span>\`
-    ).join('');
+  container.textContent = '';
+  const title = document.createElement('div');
+  title.className = 'module-chips-title';
+  title.textContent = 'Modules';
+  container.appendChild(title);
+  modules.forEach(m => container.appendChild(makeModuleChip(targetId, m.name)));
 }
 
 const APPROACH_NOTES = {
@@ -3487,33 +3780,36 @@ function renderApproachRows(group) {
     if (approach && ta) saved[approach] = ta.value;
   });
 
+  // Build card HTML without injecting user-supplied values into innerHTML.
+  // Saved textarea values are applied via .value after insertion (XSS-safe).
   container.innerHTML = selected.map(approach => {
     const taId = \`approach-\${group}-\${approach}\`;
     const ph   = notes[approach] || 'describe which modules use this approach';
-    const val  = saved[approach] ?? getDraftField(taId);
-    return \`<div class="approach-card" data-approach="\${approach}">
-      <div class="approach-card-label">\${approach}</div>
-      <textarea id="\${taId}" rows="2"
-        placeholder="\${ph}"
-        oninput="updatePreview('architecture'); updateArchProgress()">\${val}</textarea>
+    return \`<div class="approach-card" data-approach="\${esc(approach)}">
+      <div class="approach-card-label">\${esc(approach)}</div>
+      <textarea id="\${esc(taId)}" rows="2"
+        placeholder="\${esc(ph)}"
+        oninput="updatePreview('architecture'); updateArchProgress()"></textarea>
       <div class="module-chips-wrapper">
-        <div class="module-chips" data-target="\${taId}"></div>
+        <div class="module-chips" data-target="\${esc(taId)}"></div>
       </div>
     </div>\`;
   }).join('');
 
+  // Restore saved values via .value — never via innerHTML — so no content can
+  // break out of the textarea or execute as markup.
+  container.querySelectorAll('.approach-card').forEach(card => {
+    const approach = card.dataset.approach;
+    const ta = card.querySelector('textarea');
+    if (approach && ta) {
+      const val = saved[approach] ?? getDraftField(\`approach-\${group}-\${approach}\`);
+      if (val) ta.value = val;
+    }
+  });
+
   container.querySelectorAll('.approach-card .module-chips[data-target]').forEach(c => populateApproachChips(c));
 }
 
-function getApproachRows(group) {
-  const rows = [];
-  document.querySelectorAll(\`#arch-\${group}-detail .approach-card\`).forEach(card => {
-    const approach = card.dataset.approach || '';
-    const note     = (card.querySelector('textarea')?.value || '').trim();
-    rows.push({ approach, note });
-  });
-  return rows;
-}
 
 // ── Parse existing DATA_MODEL.md → entity + endpoint row objects ──
 function parseDataModelMD(text) {
@@ -3564,18 +3860,6 @@ function parseDataModelMD(text) {
 // Keywords are the single source of truth in _index.md (not MODULE_MAP). When
 // reloading a project we backfill them onto the module rows so re-saving the
 // wizard regenerates _index.md correctly instead of wiping the routing table.
-function parseIndexKeywords(text) {
-  const map = {};
-  for (const line of text.split('\\n')) {
-    const m = line.match(/^\\|\\s*(.+?)\\s*\\|\\s*(.+?)\\s*\\|\\s*(.+?)\\s*\\|/);
-    if (!m) continue;
-    const keywords = m[1].trim();
-    const name     = m[2].trim();
-    if (!name || /^-+$/.test(name) || name.toLowerCase() === 'module') continue; // header/separator
-    map[name.toLowerCase()] = keywords;
-  }
-  return map;
-}
 
 // ── Parse existing MODULE_MAP.md → module row objects ────
 function parseModuleMapMD(text) {
@@ -3988,6 +4272,16 @@ async function analyzeProject() {
 
   state.detectedInterceptors = await scanForURLProtocols(state.dirHandle);
 
+  // ── Round-trip: reload ARCHITECTURE.md if it already exists ──────────────
+  // Do this AFTER Xcode-based detection so human edits take priority over
+  // auto-detected defaults. Only the fields present in the file are overwritten.
+  const existingArch = await tryReadFile(state.dirHandle, 'agent-artifacts', 'spec-kit', 'ARCHITECTURE.md');
+  if (existingArch) {
+    const parsed = parseArchitectureMD(existingArch);
+    applyArchitectureMD(parsed);
+    state.archRoundTripped = true;
+  }
+
   updatePreview('architecture');
   updatePreview('modules');
   refreshModuleChips();
@@ -3998,23 +4292,84 @@ async function analyzeProject() {
   const moduleSource = parsedModules.length > 0
     ? \`\${parsedModules.length} modules from MODULE_MAP.md\`
     : allModules.length ? \`\${allModules.length} modules detected\` : null;
+  const archNote = state.archRoundTripped ? 'ARCHITECTURE.md reloaded' : null;
   const summary = [
     mainBundleId    ? \`bundle ID\`    : null,
     moduleSource,
     schemeNames.length  ? \`\${schemeNames.length} schemes\`  :
     buildConfigs.length ? \`\${buildConfigs.length} configs\` : null,
     state.detectedInterceptors.length ? \`\${state.detectedInterceptors.length} interceptors\` : null,
+    archNote,
   ].filter(Boolean).join(', ');
   showToast(\`Auto-filled · \${summary || 'basic settings'} · review & adjust\`, 'success');
+
+  // Run CI drift scan in background — populates banner when conventions step is viewed
+  scanCIDrift().then(drifts => {
+    state.ciDrift = drifts;
+    renderCIDriftBanner(drifts);
+    if (drifts.length > 0) {
+      showToast(\`⚠️ \${drifts.length} CI drift issue\${drifts.length > 1 ? 's' : ''} found — check Conventions step\`, 'warning');
+    }
+  });
 }
 
-function setSelectOption(id, value) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  for (const opt of el.options) {
-    if (opt.value === value || opt.text === value) { el.value = opt.value; return; }
+// ── Round-trip: parse a previously generated ARCHITECTURE.md back into wizard UI ──
+function parseArchitectureMD(text) {
+  const result = {};
+
+  // ADR-001 — arch pattern from decision line
+  const archM = text.match(/ADR-001[\\s\\S]*?Decision\\*\\*:\\s*Adopt\\s+([\\w+]+)\\s+with/);
+  if (archM) result.arch = archM[1];
+
+  // ADR-002 — confirm from heading
+  if (!result.arch) {
+    if (/ADR-002 — TCA Pattern/.test(text))   result.arch = 'TCA';
+    else if (/ADR-002 — MVVM Pattern/.test(text)) result.arch = 'MVVM';
   }
+
+  // ADR-003 — DI
+  if (/ADR-003 — Dependency Injection \\(Manual/.test(text)) result.di = 'Manual';
+  if (!result.di) {
+    const diM = text.match(/ADR-003[\\s\\S]*?Decision\\*\\*:\\s*([\\w\\- /]+)\\s+is the sole DI/);
+    if (diM) result.di = diM[1].trim();
+  }
+
+  // ADR-004 — Navigation
+  if (/ADR-004 — Navigation with NavigationStack/.test(text)) result.nav = 'NavigationStack';
+  else if (/ADR-004 — Navigation.*TCA/.test(text))            result.nav = 'TCA';
+  else if (/ADR-004 — Navigation.*Coordinator/.test(text))    result.nav = 'Coordinator';
+
+  // CONVENTIONS — UI
+  const uiM = text.match(/### UI\\n([\\s\\S]*?)(?=\\n###|\\n---|\\n##|$)/);
+  if (uiM) {
+    const uiBlock = uiM[1];
+    if (/SwiftUI/i.test(uiBlock) && /UIKit/i.test(uiBlock)) result.ui = 'Mixed';
+    else if (/SwiftUI/i.test(uiBlock)) result.ui = 'SwiftUI';
+    else if (/UIKit/i.test(uiBlock))  result.ui = 'UIKit';
+  }
+
+  // CONVENTIONS — Async
+  if (/async\\/await/.test(text) || /Swift async/.test(text)) {
+    result.asyncLibs = ['async/await'];
+    if (/Combine/.test(text)) result.asyncLibs.push('Combine');
+    if (/RxSwift/.test(text)) result.asyncLibs.push('RxSwift');
+  }
+
+  // CONVENTIONS — DI fallback
+  if (!result.di) {
+    const diM2 = text.match(/### DI\\n([^\\n]+)/);
+    if (diM2) {
+      const line = diM2[1].trim();
+      if (/Manual/i.test(line))    result.di = 'Manual';
+      else if (/Swinject/i.test(line)) result.di = 'Swinject';
+      else if (/Needle/i.test(line))   result.di = 'Needle';
+    }
+  }
+
+  return result;
 }
+
+
 
 function guessModuleKeywords(moduleName) {
   const name = moduleName.replace(/[-_]/g, ' ').toLowerCase();
@@ -4447,6 +4802,11 @@ function generateArchitectureMD() {
   const today       = new Date().toISOString().split('T')[0];
   const primaryLang = langs[0] || 'Swift';
   const bundleId    = document.getElementById('cfg-bundle-id')?.value?.trim() || 'com.example.app';
+
+  const archDetected = !!arch;
+  const diDetected   = !!di;
+  const unverified   = (name) =>
+    \`\\n  > ⚠️ [auto-detected: \${name} — verify this matches your codebase before treating it as final]\`;
   const appName     = bundleId.split('.').pop() || 'App';
 
   function approachRowsToMD(group, pills, placeholder) {
@@ -4492,7 +4852,7 @@ function generateArchitectureMD() {
 
   const adr001 = \`### ADR-001 — Layer Structure and Dependency Rule
 - **Date**: \${today}
-- **Decision**: Adopt \${arch || 'MVVM'} with strict unidirectional dependency flow.
+- **Decision**: Adopt \${arch || 'MVVM'} with strict unidirectional dependency flow.\${archDetected ? '' : unverified('MVVM')}
 - **Reason**: Enforces separation of concerns, testability, and prevents coupling between layers.
 - **Consequence**: Every new file must be placed in the correct layer. PRs that violate the dependency rule are rejected.
 
@@ -4518,7 +4878,7 @@ function generateArchitectureMD() {
   if (arch === 'TCA') {
     adr002 = \`### ADR-002 — TCA Pattern: Reducer + Store + View
 - **Date**: \${today}
-- **Decision**: All feature screens follow the TCA contract below.
+- **Decision**: All feature screens follow the TCA contract below.\${archDetected ? '' : unverified('TCA')}
 - **Reason**: Unidirectional data flow, exhaustive testing of state mutations, composable state.
 - **Consequence**: Every screen ships with a \\\`Reducer\\\`, a \\\`Store\\\`, and a stateless \\\`View\\\`.
 
@@ -4580,7 +4940,7 @@ struct ExampleView: View {
   } else if (arch === 'MVVM' || !arch) {
     adr002 = \`### ADR-002 — MVVM Pattern: ViewModel + View
 - **Date**: \${today}
-- **Decision**: All feature screens follow the MVVM contract below.
+- **Decision**: All feature screens follow the MVVM contract below.\${archDetected ? '' : unverified('MVVM')}
 - **Reason**: Clear separation between UI and business logic; ViewModel is independently testable.
 - **Consequence**: Every screen ships with a \\\`ViewModel\\\` and a stateless \\\`View\\\`.
 
@@ -4629,7 +4989,7 @@ struct ExampleView: View {
   if (diName === 'Manual') {
     adr003 = \`### ADR-003 — Dependency Injection (Manual / Protocol-based)
 - **Date**: \${today}
-- **Decision**: Dependencies injected via constructor. No DI framework.
+- **Decision**: Dependencies injected via constructor. No DI framework.\${diDetected ? '' : unverified('Manual / Protocol-based')}
 - **Reason**: Simple, compile-time safe, no additional dependencies.
 - **Consequence**: All dependencies declared in \\\`init()\\\`. Use protocols for testability.
 
@@ -4662,7 +5022,7 @@ struct MyApp: App {
   } else {
     adr003 = \`### ADR-003 — Dependency Injection with \${diName}
 - **Date**: \${today}
-- **Decision**: \${diName} is the sole DI framework. No manual service locator singletons.
+- **Decision**: \${diName} is the sole DI framework. No manual service locator singletons.\${diDetected ? '' : unverified(diName)}
 - **Reason**: Consistent dependency resolution across modules.
 - **Consequence**: All dependencies registered at app startup. Direct instantiation of injectable types is forbidden.\`;
   }
@@ -4854,7 +5214,7 @@ final class AppCoordinator: Coordinator {
   (arch || 'MVVM') + '\\n[describe target state]'}
 
 ### DI
-\${di || 'Manual / Protocol-based'} everywhere. No singletons except AppConfig.
+\${di || 'Manual / Protocol-based'} everywhere. No singletons except AppConfig.\${diDetected ? '' : unverified('Manual / Protocol-based')}
 
 ### Async
 Swift async/await everywhere.\${hasRxSwift ? ' RxSwift being removed incrementally.' : ''}\${hasCombine ? ' Combine being replaced with async/await + AsyncStream.' : ''}
@@ -4887,6 +5247,9 @@ Swift async/await everywhere.\${hasRxSwift ? ' RxSwift being removed incremental
 function buildConventionsScreen(fp) {
   fp.innerHTML += \`
   <div class="step-screen" id="screen-conventions">
+
+    <div id="ci-drift-banner" style="display:none" class="form-section" style="background:var(--warning-bg,#fff8e1);border-left:4px solid var(--warning,#f59e0b);padding:12px 16px;border-radius:6px;margin-bottom:16px"></div>
+
     <div class="form-section">
       <h3>Package / Module Prefix \${infoBtn('Used in the generated package structure example. e.g. <code>com.example.myapp</code> or simply <code>MyApp</code> for Swift.')}</h3>
       <div class="form-row">
@@ -4969,6 +5332,88 @@ function buildConventionsScreen(fp) {
     </div>
   </div>\`;
 }
+
+// ── CI Drift scanner (iOS) ─────────────────────────────────────────────────
+async function scanCIDrift() {
+  if (!state.dirHandle) return [];
+  const drifts = [];
+  const ciFiles = {};
+
+  // .github/workflows/*.yml
+  try {
+    const ghDir = await state.dirHandle.getDirectoryHandle('.github');
+    const wfDir = await ghDir.getDirectoryHandle('workflows');
+    for await (const [name, handle] of wfDir) {
+      if (handle.kind === 'file' && (name.endsWith('.yml') || name.endsWith('.yaml'))) {
+        try { ciFiles[\`.github/workflows/\${name}\`] = await (await handle.getFile()).text(); } catch {}
+      }
+    }
+  } catch {}
+
+  // fastlane/Fastfile
+  try {
+    const flDir = await state.dirHandle.getDirectoryHandle('fastlane');
+    const fh = await flDir.getFileHandle('Fastfile');
+    ciFiles['fastlane/Fastfile'] = await (await fh.getFile()).text();
+  } catch {}
+
+  // Xcode Cloud — ci_scripts/
+  try {
+    const ciScriptsDir = await state.dirHandle.getDirectoryHandle('ci_scripts');
+    for await (const [name, handle] of ciScriptsDir) {
+      if (handle.kind === 'file') {
+        try { ciFiles[\`ci_scripts/\${name}\`] = await (await handle.getFile()).text(); } catch {}
+      }
+    }
+  } catch {}
+
+  if (Object.keys(ciFiles).length === 0) return [];
+
+  const allCIText = Object.values(ciFiles).join('\\n');
+
+  // Check 1: Swift version / Xcode version in CI
+  const xcodeM  = allCIText.match(/xcode(?:-version)?[:\\s]+['"]?(\\d+[\\.\\d]*)['"]?/i);
+  const swiftM   = allCIText.match(/swift[-_]version[:\\s]+['"]?(\\d+[\\.\\d]*)['"]?/i);
+  if (xcodeM) {
+    const xcVer = parseFloat(xcodeM[1]);
+    if (xcVer < 15) {
+      drifts.push({
+        field: 'Xcode version',
+        ciValue: \`Xcode \${xcodeM[1]}\`,
+        specValue: 'Xcode 15+ (required for Swift 5.9 / Swift Macros)',
+        file: Object.keys(ciFiles).find(f => ciFiles[f].includes(xcodeM[0])),
+      });
+    }
+  }
+
+  // Check 2: SwiftLint gate
+  const lintGateScript = (await tryReadFile(state.dirHandle, '.claude', 'hooks', 'scripts', 'lint-gate.sh')) || '';
+  const lintGateActive = /swiftlint/i.test(lintGateScript);
+  const ciRunsSwiftLint = /swiftlint/i.test(allCIText);
+  if (lintGateActive && !ciRunsSwiftLint) {
+    drifts.push({
+      field: 'SwiftLint',
+      ciValue: 'not enforced in CI',
+      specValue: 'enforced via hook (lint-gate.sh)',
+      file: Object.keys(ciFiles)[0],
+    });
+  }
+
+  // Check 3: Test coverage
+  const ciHasCoverage = /codecov|coverage|xcresult.*coverage|slather/i.test(allCIText);
+  const covInputEl = document.getElementById('cov-domain');
+  if (covInputEl && !ciHasCoverage) {
+    drifts.push({
+      field: 'Coverage gate',
+      ciValue: 'no coverage report/gate found in CI',
+      specValue: 'coverage thresholds set in CONVENTIONS',
+      file: Object.keys(ciFiles)[0],
+    });
+  }
+
+  return drifts;
+}
+
 
 function generateConventionsMD() {
   const pkg          = document.getElementById('conv-package')?.value.trim() || 'MyApp';
@@ -5237,30 +5682,7 @@ function buildMigrationsScreen(fp) {
 }
 
 let customRuleCounter = 0;
-function addCustomRuleRow(defaults = {}) {
-  const id = ++customRuleCounter;
-  const row = document.createElement('div');
-  row.className = 'dynamic-item'; row.id = 'custom-rule-row-' + id;
-  row.innerHTML = \`
-    <button class="remove-btn" onclick="document.getElementById('custom-rule-row-\${id}').remove(); updatePreview('migrations'); saveDraft()">✕</button>
-    <div class="form-row">
-      <label>Rule title</label>
-      <input type="text" id="custom-rule-title-\${id}" value="\${esc(defaults.title||'')}" placeholder="e.g. Kingfisher → SDWebImage, Custom Logger" oninput="updatePreview('migrations');saveDraft()" style="font-size:13px">
-    </div>
-    <div class="form-row">
-      <label style="align-self:flex-start;padding-top:4px">Rule body</label>
-      <textarea id="custom-rule-body-\${id}" rows="4" placeholder="Describe what the agent should do when touching files that use this pattern. Use the same style as the rules above — bullet points work well." oninput="updatePreview('migrations');saveDraft()" style="font-size:12px;font-family:var(--mono);resize:vertical;width:100%">\${esc(defaults.body||'')}</textarea>
-    </div>\`;
-  document.getElementById('custom-rules-list').appendChild(row);
-  const countEl = document.getElementById('custom-rule-count');
-  if (countEl) { countEl.value = customRuleCounter; saveDraft(); }
-}
 
-function toggleMigScope(id) {
-  const checked = document.getElementById('mig-' + id)?.checked;
-  const row     = document.getElementById('mig-scope-row-' + id);
-  if (row) row.style.display = checked ? 'block' : 'none';
-}
 
 function generateNewScreensTable() {
   const ui      = getRadio('ui')   || 'SwiftUI';
@@ -5625,40 +6047,6 @@ function buildDebtScreen(fp) {
 }
 
 let debtCounter = 0;
-function addDebtRow(defaults = {}) {
-  const id  = ++debtCounter;
-  const num = String(id).padStart(3, '0');
-  const row = document.createElement('div');
-  row.className = 'dynamic-item'; row.id = 'debt-row-' + id;
-  row.innerHTML = \`
-    <button class="remove-btn" onclick="document.getElementById('debt-row-\${id}').remove(); updatePreview('debt')">✕</button>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-      <span style="font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:700">DEBT-\${num}</span>
-    </div>
-    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px">
-      <div class="form-row"><label>Title</label>
-        <input type="text" class="debt-title" value="\${esc(defaults.title||'')}" placeholder="LoginViewModel uses Combine instead of async/await" oninput="updatePreview('debt')"></div>
-      <div class="form-row"><label>Module</label>
-        <input type="text" class="debt-module" value="\${esc(defaults.module||'')}" placeholder="AuthFeature" oninput="updatePreview('debt')"></div>
-      <div class="form-row"><label>Status</label>
-        <select class="debt-status" onchange="updatePreview('debt')">
-          <option value="OPEN"\${(defaults.status||'OPEN')==='OPEN'?' selected':''}>OPEN</option>
-          <option value="SCHEDULED"\${defaults.status==='SCHEDULED'?' selected':''}>SCHEDULED</option>
-          <option value="RESOLVED"\${defaults.status==='RESOLVED'?' selected':''}>RESOLVED</option>
-        </select></div>
-    </div>
-    <div class="form-row"><label>Location (file path)</label>
-      <input type="text" class="debt-location" placeholder="Sources/AuthFeature/AuthViewModel.swift" oninput="updatePreview('debt')"></div>
-    <div class="form-row"><label>Impact</label>
-      <input type="text" class="debt-impact" placeholder="Cannot test async flows with XCTestExpectation cleanly." oninput="updatePreview('debt')"></div>
-    <div class="form-row"><label>Agent Rule (exact instruction)</label>
-      <input type="text" class="debt-rule" placeholder="Do not add new Combine pipelines here. New async work uses async/await." oninput="updatePreview('debt')"></div>
-    <div class="form-row"><label>Scheduled Ticket (if any)</label>
-      <input type="text" class="debt-ticket" placeholder="APP-88 or —" oninput="updatePreview('debt')"></div>
-  \`;
-  document.getElementById('debt-list').appendChild(row);
-  updatePreview('debt');
-}
 
 function generateDebtMD() {
   const rows     = Array.from(document.querySelectorAll('[id^="debt-row-"]'));
@@ -6278,9 +6666,31 @@ const PLATFORM = {
 };
 `;
 
-const SKELETON_CHANGELOG = {"1.2":{"date":"2026-06-08","notes":["Context freshness check: the agent verifies a context file's Key Files still exist before trusting it, and re-derives from source if any are missing.","Keywords are no longer duplicated in `MODULE_MAP.md` — `context/_index.md` is the single routing source of truth, eliminating spec-to-spec drift.","Closed the verification loop: the agent now builds/compiles and runs tests in Step 6 and must report real outcomes — code it cannot build or test can no longer report PASS.","Warn-only security scan: the agent flags hardcoded secrets (file:line) and surfaces them in the completion report, but never fixes, redacts, or moves them — remediation stays human.","Branch ownership made explicit: the agent assumes the correct branch is checked out and stops if it lands on main/master/develop.","CLAUDE.md viewer readability: stylesheet now applies, numbered lists and bare comment dividers render correctly, and the maintainer header is hidden in the preview."]},"1.1":{"date":"2026-06-07","notes":["Version manifest (`agent-artifacts/.sdd-version`) and a wizard \"Update available\" banner so projects know when their snapshot is behind the skeleton.","Single source of truth: clean source files are embedded into the wizard by `engine/generate-embedded.js` (no drift between source and the shipped copies).","Git safety: `git-guard.sh` hook plus git deny rules, and absolute-path normalization in the hook scripts."]}};
+// Thin shim written to the PROJECT ROOT so `claude` picks it up automatically
+// without the developer needing the magic "Read agent-artifacts/CLAUDE.md" prompt.
+// The full protocol lives in agent-artifacts/CLAUDE.md — this file just redirects.
+const ROOT_CLAUDE_MD_SHIM = `# CLAUDE.md
+
+This project uses the Agentic SDD Skeleton.
+The full agent protocol, spec-kit rules, and context files live in \`agent-artifacts/\`.
+
+## Running a task
+
+\`\`\`
+Read agent-artifacts/CLAUDE.md and execute agent-artifacts/tasks/<TASK-FILE>.md
+\`\`\`
+
+## First time?
+
+Run the setup wizard (\`agent-sdd/setup-wizard.html\`) to generate the full
+\`agent-artifacts/\` structure, then bootstrap context files for each module.
+
+See \`agent-artifacts/CLAUDE.md\` for the complete agent protocol.
+`;
+
+const SKELETON_CHANGELOG = {"1.4":{"date":"2026-06-18","notes":["**Surgical update mechanism**: the wizard now hash-checks CLAUDE.md, hooks, and templates before overwriting — files you've modified are detected and never silently overwritten.","**Section markers in CLAUDE.md**: `<!-- sdd:framework:start/end -->` and `<!-- sdd:custom:start/end -->` protect your project-specific rules during updates — the wizard merges the new framework section while preserving your custom zone.","**`.sdd-manifest.json`** replaces `.sdd-version` — stores per-file content hashes so the wizard knows exactly which files are safe to overwrite on the next update.","**Conflict UI**: when a modified file is detected, the wizard shows the new version with Skip / Overwrite controls — your decision, never a silent overwrite.","**PR classification in Android PR review**: the review skill now detects PR type (Feature / Bug Fix / Refactor / Task / Hotfix) from branch name and commit keywords before reviewing, making severity judgements type-aware. The wizard will hash-check each file and show a conflict dialog for any you've modified."]},"1.3":{"date":"2026-06-13","notes":["**ARCHITECTURE.md round-trip**: re-opening the wizard on an existing project reads your previous architectural choices (arch pattern, DI, UI, nav) back from `spec-kit/ARCHITECTURE.md` so human corrections survive wizard re-runs without starting from scratch.","**CI drift check**: the wizard scans `.github/workflows/`, `fastlane/Fastfile`, and `bitrise.yml` / `ci_scripts/` and surfaces mismatches between CI config and what CONVENTIONS.md will say (JDK/Xcode version, ktlint/SwiftLint gate, coverage enforcement). Shown as an amber banner at the top of the Conventions step.","**Auto-detected markers**: wizard-generated ARCHITECTURE.md now annotates every value that was defaulted (not actually detected in the codebase) with a blockquote warning so teams know which decisions need verification before committing.","**Deeper source walk**: `countSourceFiles` depth raised from 4 → 8, fixing undercount of Kotlin/Java files in deeply nested multi-module projects.","**Multi-module includes**: `include ':app', ':core', ':feature-home'` in `settings.gradle` now correctly captures all modules, not just the first argument.","**Hook language corrected**: CLAUDE.md no longer claims hooks are \"deterministic\" — they cover common enforcement cases but are not a complete sandbox.","**Hook bugs fixed**: `lint-gate.sh` — three bugs patched (shell variable expansion, SwiftLint CLI flag removed in 0.52+, `find -o` precedence). `git-guard.sh` — compound command handling. `protected-paths.sh` — write-to-protected-path detection added. your existing `spec-kit/ARCHITECTURE.md` (round-trip). Review, then re-save CLAUDE.md (final step) to get the new snapshot. you haven't customized: `cp agent-sdd/hooks/scripts/*.sh .claude/hooks/scripts/`"]},"1.2":{"date":"2026-06-08","notes":["Context freshness check: the agent verifies a context file's Key Files still exist before trusting it, and re-derives from source if any are missing.","Keywords are no longer duplicated in `MODULE_MAP.md` — `context/_index.md` is the single routing source of truth, eliminating spec-to-spec drift.","Closed the verification loop: the agent now builds/compiles and runs tests in Step 6 and must report real outcomes — code it cannot build or test can no longer report PASS.","Warn-only security scan: the agent flags hardcoded secrets (file:line) and surfaces them in the completion report, but never fixes, redacts, or moves them — remediation stays human.","Branch ownership made explicit: the agent assumes the correct branch is checked out and stops if it lands on main/master/develop.","CLAUDE.md viewer readability: stylesheet now applies, numbered lists and bare comment dividers render correctly, and the maintainer header is hidden in the preview."]},"1.1":{"date":"2026-06-07","notes":["Version manifest (`agent-artifacts/.sdd-version`) and a wizard \"Update available\" banner so projects know when their snapshot is behind the skeleton.","Single source of truth: clean source files are embedded into the wizard by `engine/generate-embedded.js` (no drift between source and the shipped copies).","Git safety: `git-guard.sh` hook plus git deny rules, and absolute-path normalization in the hook scripts."]}};
 const EMBEDDED_CLAUDE_MD = `# CLAUDE.md — Agent Entry Point
-# Snapshot version: 1.2 — regenerate via the SDD setup wizard to update
+# Snapshot version: 1.4 — regenerate via the SDD setup wizard to update
 # ─────────────────────────────────────────────────────────────────────────────
 # READ THIS FILE COMPLETELY BEFORE DOING ANYTHING ELSE.
 # This file governs every session. No exceptions.
@@ -6299,6 +6709,8 @@ const EMBEDDED_CLAUDE_MD = `# CLAUDE.md — Agent Entry Point
 #    \`node agent-sdd/engine/generate-embedded.js\` to sync it into
 #    wizard-core.js (EMBEDDED_CLAUDE_MD). Never hand-edit the embedded copy.
 # ─────────────────────────────────────────────────────────────────────────────
+
+<!-- sdd:framework:start — managed by SDD wizard. Run "Update now" in the wizard to refresh this section. -->
 
 ## Agentic AI Principles — Read This First
 
@@ -6384,7 +6796,6 @@ This SDD skeleton gives you everything you need to work accurately and safely:
 - Project configuration (\`agent-artifacts/project.config.md\`)
 - Architecture knowledge (\`agent-artifacts/spec-kit/\`)
 - Per-module living docs (\`agent-artifacts/context/\`)
-- Optional plug-n-play skills (\`agent-artifacts/skills/\`) — activated per ticket
 - The task to execute (\`agent-artifacts/tasks/<TICKET-ID>.md\`)
 
 **Directory layout:**
@@ -6470,7 +6881,7 @@ in that area, not a blocking error.
 | 3 | \`agent-artifacts/context/_index.md\` → match task keywords → load \`agent-artifacts/context/<module>.md\` for each match | Load if present — if \`_index.md\` is missing, skip Tier 3 entirely |
 | 4 | Relevant sections of \`agent-artifacts/spec-kit/TECH_DEBT.md\` | If present and touching legacy code or files listed in debt register |
 | 5 | Relevant sections of \`agent-artifacts/spec-kit/DATA_MODEL.md\` | If present and task touches data models, APIs, DB, or network |
-| 6 | Source files listed in the loaded context files that are expected to change | Per task |
+| 6 | Source files listed in the loaded context files that are expected to change — **read their actual current content now**, before forming any plan | Per task |
 
 **Missing file behaviour:**
 - Tier 1 missing → state in Understanding: "ARCHITECTURE.md / MODULE_MAP.md not found — proceeding without structural context"
@@ -6482,20 +6893,34 @@ in that area, not a blocking error.
 context files (Tier 3) before reading any source files.
 
 **Context freshness check (do this for every Tier 3 context file you load):**
-A context file is a snapshot — code may have changed since it was written, by a human
-or another agent. Before you trust its contents:
+A context file is a snapshot — code changes every sprint but context only updates when an
+agent task touches that module. Before you use its contents:
 1. Read the **Key Files** table in the context file.
 2. Verify each listed path still exists (relative to \`codebase_path\`).
-3. **If every Key File exists → trust the context** and proceed normally.
-4. **If any Key File is missing or renamed → treat the context as STALE.** Do not trust its
-   file paths, state shapes, or "Key Files" list. Re-derive from reality: read the actual
-   source at the module's \`Path\` (per \`MODULE_MAP.md\`), proceed using what you observe, and
-   record \`**Context status:** stale — re-derived from source\` in your Understanding.
-   You MUST refresh that context file in Step 7 (correct the Key Files table and any
-   state/behaviour that changed).
+3. **If every Key File exists → the context is navigable.** Use it to know where to look
+   and what patterns to expect — not as a substitute for reading actual source.
+4. **If any Key File is missing or renamed → treat the context as STALE.** Re-derive from
+   reality: read the actual source at the module's \`Path\` (per \`MODULE_MAP.md\`), proceed
+   using what you observe, and record \`**Context status:** stale — re-derived from source\`
+   in your Understanding. You MUST refresh that context file in Step 7.
 
-Do not silently rely on a context file whose Key Files no longer exist — a confidently wrong
-map is worse than no map. When in doubt, verify against source before acting.
+**What to trust from context vs what to always verify from source:**
+
+| Trust from context — changes rarely | Always verify from source — changes every sprint |
+|--------------------------------------|--------------------------------------------------|
+| Module purpose and boundaries | Exact function / method signatures |
+| Dependency graph (what imports what) | State shapes (sealed classes, data classes) |
+| DI setup and entry points | Which files currently exist in the module |
+| Known Debt entries | What a function actually does today |
+| "What the Agent Should Know" gotchas | Constructor parameters and field names |
+| Architectural patterns in use | Test file locations |
+
+**Rule: never write code against a state shape, function signature, or implementation
+detail you have not read from actual source in this session.** Context tells you where
+to look — source tells you what is there.
+
+Do not silently rely on a context file whose Key Files no longer exist — a confidently
+wrong map is worse than no map. When in doubt, verify against source before acting.
 
 **Module not in context/:** Check \`agent-artifacts/spec-kit/MODULE_MAP.md\` by module name.
 Use the \`Path\` field as the source of truth for where to find the code — this may be a
@@ -6520,29 +6945,12 @@ Read the task file the developer has provided (e.g., \`agent-artifacts/tasks/[PR
 Extract:
 - Ticket ID and title
 - Type (Feature / Bug / Refactor / Task)
-- **Skills** (the \`Skills:\` line — see "Skills (plug-n-play)" below)
 - Description
 - Acceptance criteria (these are your definition of done)
 - Out of scope (treat these as hard constraints — do not implement them)
 - Affected areas (use to confirm or expand Tier 3 context loading)
 - Testing requirements
 - Any designs or reference links
-
-### Skills (plug-n-play)
-
-A skill is an **optional instruction module** that adds requirements for a single ticket.
-Skills are **off by default**.
-
-1. Read the task's \`Skills:\` line. If it is missing or says \`none\` → no skills active; run the
-   normal workflow unchanged.
-2. For each skill named, load \`agent-artifacts/skills/<skill>.md\` (the registry of available
-   skills is \`agent-artifacts/skills/_index.md\`).
-3. Apply each active skill's rules **on top of** Steps 3–8 — typically an added line in your
-   Understanding (Step 3), extra checks in Self-Verification (Step 6), and an extra section in
-   the completion report (Step 8). Each skill file states exactly what it adds.
-4. A skill only **adds** requirements — it never relaxes a Hard Rule or the base quality gate.
-5. If a named skill has no matching file in \`agent-artifacts/skills/\`, note the gap in your
-   Understanding and continue — do not stop.
 
 ---
 
@@ -6599,10 +7007,16 @@ If the task MD is silent AND \`default_tests: N\` → ask: "Do you want tests fo
 Write code following \`agent-artifacts/spec-kit/CONVENTIONS.md\` and \`agent-artifacts/spec-kit/MIGRATION_RULES.md\` exactly.
 Apply \`agent-artifacts/spec-kit/TESTING.md\` for all test files.
 
+**Read before you write.** Before modifying any existing file, read its current content
+from source — even if a context file already describes it. Context describes the module
+as it was when last updated; source is what it is right now. Writing code against a stale
+mental model is the most common cause of agent errors. No exceptions.
+
 **Execution order:**
-1. Create new files first (models, repositories, use cases)
-2. Modify existing files
-3. Write test files last (or interleaved per TDD if specified)
+1. Read all files you plan to modify (Tier 6 if not done yet)
+2. Create new files first (models, repositories, use cases)
+3. Modify existing files
+4. Write test files last (or interleaved per TDD if specified)
 
 ---
 
@@ -6680,10 +7094,6 @@ Scan every file you created or modified against the checks for your platform:
 | Tests follow TESTING.md naming | \`functionName_scenario_expectedResult\` |
 
 For each failure found: **fix it before proceeding.** Log what you fixed under Self-Corrections.
-
-**Active skills:** if the task activated any skills (Step 2), run each active skill's own gate now
-as well (e.g. the Accessibility Gate, the Analytics Gate). Their checks are additional to — never a
-replacement for — the base quality gate above.
 
 ### 6d — Security Scan (warn only — NEVER fix)
 
@@ -6859,7 +7269,7 @@ The project's \`.claude/settings.json\` (installed from \`agent-artifacts/hooks/
 | \`lint-gate.sh\` (PostToolUse) | Runs ktlint (Android) or SwiftLint (iOS) after every file edit |
 | \`done-gate.sh\` (Stop) | Audits \`git diff\` on session end and warns about any protected-file touches |
 
-These hooks are **deterministic** — they run regardless of what this file says. CLAUDE.md is the fallback for behavior the hooks don't cover (logic, naming, structure). Never attempt to write to protected paths; the hook will block it and the task will stall.
+These hooks run automatically on every tool call and cover the most common enforcement cases. They are not a complete sandbox — compound shell commands, indirect writes, and novel bypass paths may not be caught. CLAUDE.md rules apply regardless; hooks are a safety net, not a substitute for following this protocol. Never attempt to write to protected paths — the hook will block the most direct attempts and the task will stall.
 
 ---
 
@@ -6873,8 +7283,381 @@ A well-executed task:
 - Context files are updated so the next agent session starts smarter
 - Completion report is honest — blocked criteria and new debt are surfaced, not hidden
 - Code follows CONVENTIONS.md exactly — naming, structure, patterns
+
+<!-- sdd:framework:end -->
+
+---
+
+<!-- sdd:custom:start — Add your project-specific rules and overrides below this line.
+     The SDD wizard preserves everything in this section on every update.
+     Examples: team-specific naming conventions, forbidden APIs, extra quality gates. -->
+
+<!-- sdd:custom:end -->
 `;
 
+// ── Embedded: .claude/skills/android-pr-review/SKILL.md ──────────────────
+const EMBEDDED_ANDROID_PR_SKILL = `# Skill: Android PR Review
+
+## Purpose
+Perform a holistic, project-aware code review of a pull request.
+Review the full change set as a coherent unit — understand the intent and type first,
+then evaluate code quality. Never review file-by-file in isolation.
+
+## Invocation
+\`\`\`
+claude "Load .claude/skills/android-pr-review/SKILL.md and review this PR against <base-branch>"
+\`\`\`
+The developer must supply the base branch explicitly (e.g. \`main\`, \`develop\`, \`release/2.1\`).
+
+---
+
+## Review Protocol
+
+Execute every phase in order. Do not open individual files until Phase 2 is complete.
+
+---
+
+### Phase 0 — Confirm Base Branch
+
+Verify the base branch exists and the current branch has diverged from it:
+\`\`\`bash
+git fetch origin
+git log origin/<base-branch>..HEAD --oneline
+\`\`\`
+If the branch is up to date with base (no commits ahead), stop and tell the developer
+there is nothing to review — the branch has not diverged.
+
+---
+
+### Phase 1 — PR Classification  *(before reading the diff)*
+
+Determine what kind of PR this is before forming any opinion. This shapes the entire review.
+
+\`\`\`bash
+# Current branch name — check for type prefix
+git rev-parse --abbrev-ref HEAD
+
+# All commit messages — scan for type keywords
+git log origin/<base-branch>..HEAD --format="%s %b" --reverse
+
+# Check for linked ticket references in commits or branch name
+git log origin/<base-branch>..HEAD --format="%s %b" | grep -iE '([A-Z]+-[0-9]+|#[0-9]+)' || true
+\`\`\`
+
+**Classify the PR into exactly one type:**
+
+| Type | Branch prefix clues | Commit keyword clues |
+|------|--------------------|--------------------|
+| **Feature** | \`feature/\`, \`feat/\` | \`feat:\`, \`add\`, \`implement\`, \`introduce\` |
+| **Bug Fix** | \`bugfix/\`, \`fix/\`, \`hotfix/\` | \`fix:\`, \`bug:\`, \`patch:\`, \`resolve\` |
+| **Refactor** | \`refactor/\`, \`cleanup/\` | \`refactor:\`, \`restructure\`, \`reorganize\`, \`move\`, \`rename\` |
+| **Task / Chore** | \`task/\`, \`chore/\`, \`tech/\`, \`dep/\` | \`chore:\`, \`task:\`, \`bump\`, \`upgrade\`, \`update deps\` |
+| **Hotfix** | \`hotfix/\`, \`release-fix/\` | \`hotfix:\`, \`critical fix\` |
+
+If the branch name and commits give conflicting signals, use the commit messages as the source of truth.
+If classification is genuinely ambiguous, state "Unclassified — treating as Feature" and continue.
+
+**Extract:**
+- **Linked ticket**: JIRA key (\`PROJECT-123\`), GitHub issue (\`#456\`), or "None found"
+- **Affected area**: which feature/module the changes touch (inferred from branch name or commits)
+
+Hold this classification in mind — it controls what you flag as Critical vs Major in later phases.
+
+---
+
+### Phase 2 — Understand the PR  *(read before any file)*
+
+**Do not open individual files yet.** Form a complete picture of the change.
+
+\`\`\`bash
+# All commits in this PR (oldest → newest)
+git log origin/<base-branch>..HEAD --oneline --reverse
+
+# Detailed commit messages — understand the narrative
+git log origin/<base-branch>..HEAD --format="%H %s%n%b" --reverse
+
+# High-level scope: what files changed and how much
+git diff --stat origin/<base-branch>...HEAD
+
+# Overall diff (read fully before forming any opinion)
+git diff origin/<base-branch>...HEAD
+\`\`\`
+
+Answer these questions — **filtered by the PR type from Phase 1**:
+
+**All types:**
+1. **What does this PR do?** (2-3 sentences, in your own words)
+2. **Is the scope coherent?** (one concern, or multiple unrelated changes?)
+3. **Are the commit messages clear and atomic?**
+
+**Feature:**
+4. Is the feature complete, or are there half-built paths / TODO stubs left in production code?
+5. Does it handle all UI states — loading, success, error, and empty?
+
+**Bug Fix:**
+4. Does the fix address the root cause or just the symptom?
+5. Is the change minimal and focused, or does it bundle unrelated edits?
+6. Is there a regression test that would have caught this bug before the fix?
+
+**Refactor:**
+4. Does it change any observable behaviour, or is it a pure structural move?
+5. Do the existing tests cover the refactored code well enough to prove no regression?
+
+**Task / Chore:**
+4. Does it accidentally touch production logic, or is it strictly build/config/dependency changes?
+
+**Hotfix:**
+4. Is the change absolutely minimal — only what is needed to fix the issue?
+5. Is it safe to cherry-pick onto a release branch without pulling in other work?
+
+If the PR scope is too large to review meaningfully in one pass (> ~500 lines of production code),
+flag this as a Major finding immediately.
+
+---
+
+### Phase 3 — Load Project Context
+
+Read the project's own standards so the review is project-aware, not generic.
+Skip any file that does not exist — do not error.
+
+\`\`\`bash
+cat agent-artifacts/spec-kit/ARCHITECTURE.md   2>/dev/null || true
+cat agent-artifacts/spec-kit/CONVENTIONS.md    2>/dev/null || true
+cat agent-artifacts/spec-kit/TESTING.md        2>/dev/null || true
+cat agent-artifacts/spec-kit/TECH_DEBT.md      2>/dev/null || true
+\`\`\`
+
+Extract and hold in mind:
+- The target architecture pattern (MVVM / Clean+MVI / Clean)
+- The dependency rule (which layer may import which)
+- Banned patterns (e.g. \`!!\`, \`GlobalScope\`, \`LiveData\`, direct DataSource calls from ViewModel)
+- DI framework in use (Hilt / Koin / Manual)
+- Coverage targets per layer
+- Any known tech debt areas — changes touching these need extra scrutiny
+
+---
+
+### Phase 4 — Architecture Review
+
+Using the diff from Phase 2 and the ADRs from Phase 3, assess the overall design.
+
+Check:
+- [ ] **Dependency rule respected** — no layer imports from a layer above it
+- [ ] **New classes placed in the correct layer package**
+- [ ] **No business logic in the UI layer** (Composables, Fragments, Activities)
+- [ ] **No Android framework types in ViewModel** (\`Context\`, \`View\`, \`FragmentManager\`, \`Resources\`)
+- [ ] **Repository / UseCase boundary honoured** — ViewModel does not call DataSource directly
+- [ ] **New patterns consistent with existing code** — a new screen should look like existing screens
+- [ ] **ADR compliance** — any decision that contradicts an ADR must be flagged as Critical
+
+**For Bug Fix PRs additionally check:**
+- [ ] The fix is applied at the correct layer — not patched in the UI when the bug is in the domain layer
+
+**For Refactor PRs additionally check:**
+- [ ] The refactor moves code *toward* the target architecture, not away from it
+
+---
+
+### Phase 5 — Conventions & Code Quality
+
+Review against the project's CONVENTIONS.md. If that file doesn't exist, use the
+Android defaults below. Project-specific rules always override defaults.
+
+**Kotlin defaults:**
+- [ ] No \`!!\` null assertions — use \`?.let {}\`, \`?: return\`, or \`requireNotNull()\`
+- [ ] No \`lateinit var\` except \`@Inject\`-ed fields
+- [ ] \`val\` preferred over \`var\`
+- [ ] \`data class\` used for state/model types; no \`var\` fields in data classes
+- [ ] Every \`when\` on a sealed class/interface is exhaustive — no \`else\` on sealed types
+- [ ] No \`GlobalScope\` — all coroutines launched from \`viewModelScope\` or a scoped coroutine context
+- [ ] No \`runBlocking\` in production code
+- [ ] IO operations use \`Dispatchers.IO\`, CPU-bound work uses \`Dispatchers.Default\`
+- [ ] No anonymous inner classes that capture Activity/Fragment context (leak risk)
+- [ ] Extension functions in a dedicated \`[Subject]Extensions.kt\` file
+- [ ] Named arguments when calling functions with 3+ params of the same type
+
+**StateFlow / UI state:**
+- [ ] UI state exposed as \`StateFlow<UiState>\` — not \`LiveData\`, not mutable
+- [ ] \`_state\` private \`MutableStateFlow\`, \`state\` public \`StateFlow\`
+- [ ] One-shot events (navigation, toasts) via \`SharedFlow\`, not part of \`UiState\`
+
+**Compose:**
+- [ ] Composables are stateless — state hoisted to ViewModel or caller
+- [ ] No \`ViewModel\` instantiation inside a Composable (use \`hiltViewModel()\` or param)
+- [ ] No \`Flow.collectAsState\` inside composition without \`remember\`
+- [ ] No hardcoded hex colours — use MaterialTheme tokens
+- [ ] No hardcoded strings — use \`stringResource()\`
+- [ ] No magic numbers — extract to named constants
+
+**Dependency injection:**
+- [ ] No manual \`object\` singletons for injectable types
+- [ ] No \`new\`/direct instantiation of classes that are \`@Inject\`-annotated
+- [ ] New dependencies declared in a \`@Module\`, not in the class under injection
+
+---
+
+### Phase 6 — Test Coverage
+
+\`\`\`bash
+# List test files changed or added in this PR
+git diff --name-only origin/<base-branch>...HEAD | grep -E '(Test|Spec)\\.kt$'
+
+# List production files changed — every new class/function should have a test
+git diff --name-only origin/<base-branch>...HEAD | grep -v Test | grep '\\.kt$'
+\`\`\`
+
+Check:
+- [ ] **Every new public function in ViewModel / UseCase / Repository has a unit test**
+- [ ] **New UI state transitions are tested** (success, loading, error paths)
+- [ ] **Tests use the project's approved mocking library** (MockK or Mockito — per TESTING.md)
+- [ ] **Flow/StateFlow tested with Turbine** (if in use) — no \`Thread.sleep\` or \`delay\` in tests
+- [ ] **Test function names follow the convention**: \`given_<state>_when_<action>_then_<outcome>\` or equivalent
+- [ ] **No \`@Ignore\`-d tests without a linked ticket**
+- [ ] **No flaky patterns**: no \`runBlocking\` in test bodies where \`runTest\` applies
+
+If a production file was changed but no test file exists and no test file was added:
+flag as a Major finding.
+
+---
+
+### Phase 7 — Security Scan
+
+\`\`\`bash
+# Check for common secret patterns in the diff
+git diff origin/<base-branch>...HEAD | grep -iE \\
+  '(api_?key|secret|password|token|bearer|auth)[[:space:]]*[=:][[:space:]]*["\\x27][^"\\x27]{8,}' \\
+  || true
+
+# Check for logging of potentially sensitive data
+git diff origin/<base-branch>...HEAD | grep -iE \\
+  'Log\\.(d|i|v|w|e)\\(.*\\b(password|token|secret|email|phone|ssn|credit)' \\
+  || true
+\`\`\`
+
+Check:
+- [ ] No hardcoded API keys, secrets, tokens, or passwords in any file
+- [ ] No logging of PII or authentication data
+- [ ] No \`BuildConfig\` fields that embed production secrets
+- [ ] No \`http://\` URLs in production code (must be \`https://\`)
+- [ ] No \`setJavaScriptEnabled(true)\` without documented justification
+- [ ] Sensitive data not written to \`SharedPreferences\` unencrypted
+
+⚠️ If a secret is found: **report it as Critical, do not print the secret value**.
+State the file and line number only. Remediation is for the developer, not the agent.
+
+---
+
+### Phase 8 — Holistic Assessment
+
+Step back from individual findings. Consider the PR as a whole through the lens of its type.
+
+**All types:**
+- **Is the PR the right size?** > ~500 lines of production code change is a risk.
+- **Does the commit history tell a coherent story?** "WIP", "fix", "oops" commits should be flagged.
+- **Does it introduce new tech debt?** If yes, is there a ticket for it?
+
+**Feature:**
+- Is anything missing that would make the feature incomplete from a user perspective?
+- Is there updated documentation or a MODULE_MAP entry for the new screen/flow?
+
+**Bug Fix:**
+- Is there clear evidence in the diff that the root cause is addressed?
+- Would a code reviewer be able to trace from the bug symptom → root cause → fix without guessing?
+
+**Refactor:**
+- Does the change leave the codebase in a better state, or does it just move complexity?
+- Are there better idiomatic approaches that were missed?
+
+**Hotfix:**
+- Could this fix introduce a regression elsewhere? Flag if the change touches shared utilities.
+- Is there a follow-up ticket to do a proper fix if this is a temporary patch?
+
+---
+
+## Output Format
+
+Produce the review in this exact structure. Be specific — every finding must include
+the file name and line reference from the diff.
+
+\`\`\`
+## PR Review — <branch-name> → <base-branch>
+
+**Type**: Feature / Bug Fix / Refactor / Task / Hotfix  |  **Ticket**: <ticket-id or None>
+**Commits**: <n>  |  **Files changed**: <n>  |  **Lines**: +<n> / -<n>
+
+### What this PR does
+<2-3 sentences. Your understanding of the intent, type, and approach.>
+
+### Verdict
+✅ Approve  /  ⚠️ Approve with minor fixes  /  🟡 Request changes  /  🔴 Block
+
+<One sentence justification for the verdict.>
+
+---
+
+### Architecture
+<Pass / concern / violation — with reasoning tied to the project's ADRs>
+
+---
+
+### Findings
+
+#### 🔴 Critical — must fix before merge
+<!-- Blocks merge. Security issues, ADR violations, data loss risk. -->
+- **[FileName.kt:line]** <finding> — <why it matters> <suggested fix>
+
+#### 🟡 Major — should fix
+<!-- Does not block but degrades quality, testability, or consistency. -->
+- **[FileName.kt:line]** <finding> — <why it matters>
+
+#### 🔵 Minor / Suggestion
+<!-- Style, readability, idiomatic Kotlin, better approach. Non-blocking. -->
+- **[FileName.kt:line]** <finding>
+
+---
+
+### Test Coverage
+<Summary: adequate / gaps found. List specific untested cases if gaps exist.>
+
+---
+
+### Security
+<Clean / issues found. File + line only — no secret values.>
+
+---
+
+### What's done well
+<!-- Always include. Specific, genuine. Helps the author know what to keep. -->
+- ...
+
+### Questions for the author
+<!-- Genuine questions, not disguised criticism. -->
+- ...
+
+### Commit quality
+<Atomic and clear / issues: list problematic commit messages>
+\`\`\`
+
+---
+
+## Behaviour Rules
+
+- **Never approve a PR with a Critical finding.**
+- **Never print secret or credential values** — file and line only.
+- **Never suggest rewriting the whole PR** — work with what's there.
+- **Never be vague** — every finding needs a file reference.
+- **Do not repeat the same finding multiple times** — consolidate.
+- **Positives are mandatory** — a review with only negatives is not a good review.
+- **Findings must reference the diff, not hypotheticals** — only flag what is
+  actually in the changed code, not what could theoretically go wrong.
+- **PR type drives severity** — a missing regression test on a Bug Fix is Critical;
+  the same gap on a Refactor is Major. Apply proportionate judgement.
+`;
+
+// ── Embedded: .claude/commands/android-pr-review.md ──────────────────
+const EMBEDDED_ANDROID_PR_COMMAND = `Read \`.claude/skills/android-pr-review/SKILL.md\` and execute the review protocol.
+The base branch is: $ARGUMENTS
+`;
 // ── Embedded: tasks/TASK_TEMPLATE.md ──────────────────
 const EMBEDDED_TASK_TEMPLATE = `# Task: [TICKET-ID] — [Title]
 # ─────────────────────────────────────────────────────────────────────────────
@@ -6891,18 +7674,6 @@ const EMBEDDED_TASK_TEMPLATE = `# Task: [TICKET-ID] — [Title]
 - [ ] Bug
 - [ ] Refactor
 - [ ] Task
-
-## Skills
-
-<!--
-Plug-n-play skill modules to activate for THIS ticket. Off by default.
-Available skills (see agent-artifacts/skills/_index.md):
-  - ada       → accessibility (a11y) compliance for UI you touch
-  - analytics → analytics event instrumentation for user actions / screen views
-List the ones this ticket needs, or "none".
--->
-
-Skills: none
 
 ## Description
 
@@ -7294,173 +8065,6 @@ For tasks touching >1 module: load ALL matching context files, then proceed.
 - Keep both in sync when adding a new module.
 `;
 
-// ── Embedded: skills/ (plug-n-play skill modules) ─────
-// Populated by engine/generate-embedded.js from skills/*.md.
-const EMBEDDED_SKILLS_INDEX = `# Skills Index
-# ─────────────────────────────────────────────────────────────────────────────
-# Plug-n-play skill modules. A skill is OFF by default and turns ON only when a
-# task's \`Skills:\` line names it. The agent reads this index to know which skills
-# exist and where to load each one from.
-# ─────────────────────────────────────────────────────────────────────────────
-
-## Available Skills
-
-| Skill | File | What it enforces when active |
-|-------|------|------------------------------|
-| \`ada\` | \`skills/ada.md\` | Accessibility (a11y) compliance for UI the task touches — labels, touch targets, text scaling, color-independent signals. |
-| \`analytics\` | \`skills/analytics.md\` | Analytics event instrumentation for in-scope user actions / screen views, through the project's existing analytics mechanism, no PII. |
-
-## How a developer turns a skill on
-
-Add the skill name to the task file's \`Skills:\` line:
-
-\`\`\`
-## Skills
-
-Skills: ada, analytics
-\`\`\`
-
-\`Skills: none\` (or omitting the line) = no skills active; the agent runs the normal workflow.
-
-## How the agent uses this (summary — full rules in CLAUDE.md Step 2)
-
-1. Read the task's \`Skills:\` line.
-2. For each named skill, load \`agent-artifacts/skills/<skill>.md\`.
-3. Apply each active skill's rules on top of Steps 3–8. A skill never relaxes a
-   Hard Rule or the base quality gate — it only adds requirements.
-4. If a named skill has no matching file, note the gap and continue — do not stop.
-
-<!-- Add a row here whenever you add a new skill module to skills/. -->
-`;
-const EMBEDDED_SKILL_ADA = `# Skill: ada — Accessibility (a11y) Compliance
-# ─────────────────────────────────────────────────────────────────────────────
-# A plug-n-play skill module. It is ACTIVE only when a task's \`Skills:\` line lists
-# \`ada\`. When active, apply the rules below ON TOP OF the normal Steps 0–8.
-# Scope is limited to UI the task creates or modifies — do not retrofit the
-# whole app. Read-only for the agent; humans edit this in agent-sdd/skills/.
-# ─────────────────────────────────────────────────────────────────────────────
-
-## When this skill is active
-
-The ticket touches user-facing UI and must meet accessibility standards. Apply these
-checks to every screen, view, or component you **create or modify** — not to code you
-only read.
-
-If the project's \`spec-kit/CONVENTIONS.md\` defines accessibility rules, those take
-precedence over the defaults here.
-
-## What it adds to your workflow
-
-- **Step 3 (Understanding):** add a line \`**Accessibility (ada):** active — <screens/views in scope>\`.
-- **Step 5 (Execute):** build accessibility in as you write the UI — do not bolt it on after.
-- **Step 6 (Self-Verification):** run the Accessibility Gate below in addition to the normal quality gate.
-- **Step 8 (Completion report):** add an \`### Accessibility (ada)\` section listing what you verified and what needs manual review.
-
-## Accessibility Gate
-
-Scan every UI file you created or modified.
-
-**Android**
-
-| Check | Rule |
-|-------|------|
-| Content labels | Every actionable / informative view has a \`contentDescription\` (or \`contentDescription = null\` for purely decorative images). Compose: \`Modifier.semantics\` / \`contentDescription\`. |
-| Touch targets | Interactive targets are at least \`48dp × 48dp\` (\`minWidth\`/\`minHeight\` or \`Modifier.sizeIn\`). |
-| Text scaling | Text sizes use \`sp\`, not \`dp\`; layouts do not hard-code heights that clip scaled text. |
-| Color is not the only signal | State/meaning conveyed by color also has text, icon, or shape. |
-| Focus & order | Screen-reader (TalkBack) focus order is logical; related controls grouped. |
-| Labels not redundant | No "button"/"image" baked into the label — the role announces that. |
-
-**iOS**
-
-| Check | Rule |
-|-------|------|
-| Labels | Every control has a meaningful \`accessibilityLabel\`; decorative images are hidden via \`accessibilityHidden(true)\`. |
-| Dynamic Type | Text uses scalable styles (\`.font(.body)\` / \`UIFontMetrics\`), not fixed point sizes. |
-| Touch targets | Tappable targets are at least \`44pt × 44pt\`. |
-| Color is not the only signal | Meaning conveyed by color also has text/icon/shape. |
-| Traits | Controls expose correct \`accessibilityTraits\` (\`.button\`, \`.header\`, etc.). |
-| VoiceOver order | Reading order is logical; related elements grouped with \`accessibilityElement(children:)\`. |
-
-## Evidence & honesty rule
-
-- Report each view you labeled and how (file:line).
-- **Color contrast** usually cannot be measured from source alone. Do NOT claim a contrast
-  pass you did not verify — list color/background pairs you introduced as
-  \`manual review needed — verify ≥ 4.5:1 (3:1 for large text)\`.
-- Anything you cannot confirm from code → flag for manual review rather than asserting pass.
-
-## Completion report section
-
-\`\`\`
-### Accessibility (ada)
-- Labeled: [file:line — view → label]
-- Touch targets verified: [file:line]
-- Text scaling: [pass / issue]
-- Manual review needed: [contrast pairs, anything not verifiable from source]
-\`\`\`
-`;
-const EMBEDDED_SKILL_ANALYTICS = `# Skill: analytics — Event Instrumentation
-# ─────────────────────────────────────────────────────────────────────────────
-# A plug-n-play skill module. It is ACTIVE only when a task's \`Skills:\` line lists
-# \`analytics\`. When active, apply the rules below ON TOP OF the normal Steps 0–8.
-# Scope is limited to user actions / screen views in UI the task creates or
-# modifies. Read-only for the agent; humans edit this in agent-sdd/skills/.
-# ─────────────────────────────────────────────────────────────────────────────
-
-## When this skill is active
-
-The ticket requires user behaviour to be instrumented with analytics/tracking events.
-Add events for the user actions and screen views in scope — nothing more.
-
-## Use the project's existing analytics, never invent one
-
-Before adding any event:
-1. Find how the project already sends analytics — search the loaded context files and
-   source for the existing analytics manager / wrapper / SDK call (e.g. an
-   \`AnalyticsManager\`, \`Tracker\`, \`logEvent(...)\`, Firebase \`FirebaseAnalytics\`).
-2. **Route every new event through that existing mechanism.** Do NOT add a new SDK,
-   a new wrapper, or direct SDK calls scattered in the UI.
-3. If you cannot find an existing analytics mechanism, do NOT guess one — STOP and ask
-   the developer which to use (Ambiguity Protocol).
-
-If \`spec-kit/CONVENTIONS.md\` or \`spec-kit/DATA_MODEL.md\` defines an event naming
-convention or schema, follow it exactly. Otherwise default to \`snake_case\` event names.
-
-## What it adds to your workflow
-
-- **Step 3 (Understanding):** add \`**Analytics (analytics):** active — <actions/screens to instrument>\` and name the existing analytics mechanism you will use.
-- **Step 5 (Execute):** fire events from the correct layer (prefer ViewModel/Presenter over View, matching the project's pattern), through the existing analytics wrapper.
-- **Step 6 (Self-Verification):** run the Analytics Gate below.
-- **Step 8 (Completion report):** add an \`### Analytics (analytics)\` section listing every event.
-
-## Analytics Gate
-
-| Check | Rule |
-|-------|------|
-| Existing mechanism | Events go through the project's existing analytics wrapper — no new SDK or ad-hoc calls. |
-| Naming | Event + property names follow the project convention (or \`snake_case\` default); consistent tense/voice. |
-| Coverage | Every in-scope user action and screen view has an event — no silent gaps. |
-| No PII | No emails, names, phone numbers, tokens, precise location, or free-text user input in event params. Use stable IDs only. |
-| Layer | Events fire from the layer the project uses (typically ViewModel/Presenter), not buried in UI callbacks unless that is the established pattern. |
-| No duplicates | The same action does not fire the same event from two places. |
-
-## Evidence & honesty rule
-
-- List every event with its name, properties, and the exact trigger location (file:line).
-- If a property value's source is unclear or could contain PII, flag it rather than shipping it.
-- Do not claim an event "fires correctly" without pointing to where it is dispatched.
-
-## Completion report section
-
-\`\`\`
-### Analytics (analytics)
-- Mechanism used: [AnalyticsManager / Firebase / ... — file]
-- Events added:
-  - \`event_name\` — props: [key: type] — fired at [file:line] when [trigger]
-- PII check: [pass — no PII in params / flagged: ...]
-\`\`\`
-`;
 
 // ── Embedded: hooks/settings.json ─────────────────────
 const EMBEDDED_HOOKS_SETTINGS = `{
@@ -7576,28 +8180,45 @@ deny() {
   exit 0
 }
 
-# Normalize: collapse whitespace, strip leading spaces
-CMD=$(echo "$COMMAND" | tr -s ' \\t' ' ' | sed 's/^ //')
+# Extract every \`git ...\` fragment from the command.
+# Handles compound commands:  cd app && git commit
+#           -C flag:           git -C subdir commit
+#           sh -c wrappers:    sh -c "git push"
+# Each fragment is the text from 'git' up to the next shell separator (;|&).
+while IFS= read -r gitfrag; do
+  [ -z "$gitfrag" ] && continue
 
-# ── Block git write operations ────────────────────────────────────────────────
-case "$CMD" in
-  git\\ commit*)
-    deny "git commit is not allowed — the agent must never create commits. Stage and commit changes yourself after reviewing." ;;
-  git\\ push*)
-    deny "git push is not allowed — the agent must never push to a remote. Push changes yourself after reviewing." ;;
-  git\\ add*)
-    deny "git add is not allowed — staging is part of the commit workflow. Stage changes yourself after reviewing the agent's work." ;;
-  git\\ merge*)
-    deny "git merge is not allowed — branch merges are a human decision." ;;
-  git\\ rebase*)
-    deny "git rebase is not allowed — history rewriting is a human decision." ;;
-  git\\ tag*)
-    deny "git tag is not allowed — tagging releases is a human decision." ;;
-  git\\ reset\\ --hard*)
-    deny "git reset --hard is not allowed — this would discard uncommitted changes permanently." ;;
-  git\\ clean*)
-    deny "git clean is not allowed — this would delete untracked files permanently." ;;
-esac
+  # Find the git subcommand by skipping past any flag/value pairs (-C dir, --git-dir=x, etc.)
+  args=$(echo "$gitfrag" | sed 's/^\\s*git\\s*//')
+  subverb=""
+  for word in $args; do
+    case "$word" in
+      -*) continue ;;     # skip flags
+      *) subverb="$word"; break ;;
+    esac
+  done
+
+  case "$subverb" in
+    commit)
+      deny "git commit is not allowed — the agent must never create commits. Stage and commit changes yourself after reviewing." ;;
+    push)
+      deny "git push is not allowed — the agent must never push to a remote. Push changes yourself after reviewing." ;;
+    add)
+      deny "git add is not allowed — staging is part of the commit workflow. Stage changes yourself after reviewing the agent's work." ;;
+    merge)
+      deny "git merge is not allowed — branch merges are a human decision." ;;
+    rebase)
+      deny "git rebase is not allowed — history rewriting is a human decision." ;;
+    tag)
+      deny "git tag is not allowed — tagging releases is a human decision." ;;
+    reset)
+      if echo "$args" | grep -q '\\-\\-hard'; then
+        deny "git reset --hard is not allowed — this would discard uncommitted changes permanently."
+      fi ;;
+    clean)
+      deny "git clean is not allowed — this would delete untracked files permanently." ;;
+  esac
+done < <(echo "$COMMAND" | grep -oE '\\bgit\\b[^;|&"]*')
 
 exit 0
 `;
@@ -7605,9 +8226,12 @@ exit 0
 // ── Embedded: hooks/scripts/protected-paths.sh ────────
 const EMBEDDED_PROTECTED_PATHS_SH = `#!/usr/bin/env bash
 # PreToolUse hook — blocks writes to generated/tool files that agents must never touch.
+# Covers both direct file tool calls (Write/Edit/MultiEdit) and Bash commands
+# that write to protected paths (sed -i, echo >>, mv, cp, tee, etc.).
 
 INPUT=$(cat)
 
+# ── Extract file path from direct file-tool calls (Write / Edit / MultiEdit) ─
 FILE_PATH=$(echo "$INPUT" | python3 -c "
 import sys, json
 try:
@@ -7618,7 +8242,20 @@ except Exception:
     print('')
 " 2>/dev/null)
 
-if [ -z "$FILE_PATH" ]; then
+# ── Extract Bash command (if the tool is Bash) ────────────────────────────────
+BASH_CMD=$(echo "$INPUT" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    if data.get('tool_name', '').lower() == 'bash':
+        print(data.get('tool_input', {}).get('command', ''))
+    else:
+        print('')
+except Exception:
+    print('')
+" 2>/dev/null)
+
+if [ -z "$FILE_PATH" ] && [ -z "$BASH_CMD" ]; then
   exit 0
 fi
 
@@ -7661,6 +8298,19 @@ deny() {
 [[ "$CLEAN" == */build/* || "$CLEAN" == build/* ]] && deny "build/ is a generated output directory — do not write files here."
 [[ "$CLEAN" == DerivedData/* || "$CLEAN" == */DerivedData/* ]] && deny "DerivedData/ is Xcode's build cache — do not write files here."
 
+# ── Bash write detection ──────────────────────────────────────────────────────
+# Guard against Bash commands that write to protected paths.
+# Checks for: sed -i, echo/printf >, >>, mv, cp, tee, install targeting a protected path.
+if [ -n "$BASH_CMD" ]; then
+  PROTECTED_PATTERN='agent-artifacts/CLAUDE\\.md|agent-artifacts/spec-kit/|agent-sdd/'
+  WRITE_OPS_PATTERN='sed[[:space:]]+-i|>|>>|[[:space:]]mv[[:space:]]|[[:space:]]cp[[:space:]]|[[:space:]]tee[[:space:]]|[[:space:]]install[[:space:]]'
+
+  if echo "$BASH_CMD" | grep -qE "$PROTECTED_PATTERN" && \\
+     echo "$BASH_CMD" | grep -qE "$WRITE_OPS_PATTERN"; then
+    deny "Bash write to a protected path detected — agent-artifacts/spec-kit/, agent-artifacts/CLAUDE.md, and agent-sdd/ are read-only. Use the wizard to regenerate AI artifacts."
+  fi
+fi
+
 exit 0
 `;
 
@@ -7685,7 +8335,10 @@ if [ -z "$FILE_PATH" ]; then
 fi
 
 if [ -z "$PLATFORM" ]; then
-  if [ -f "gradlew" ] || find . -maxdepth 3 -name "*.gradle" -o -name "*.gradle.kts" 2>/dev/null | grep -q .; then
+  # Fix: wrap -o alternatives in \\( \\) to avoid find precedence bug.
+  # Without grouping, \`-maxdepth 3 -name "*.gradle" -o -name "*.gradle.kts"\` applies
+  # -maxdepth only to the first term, not the second.
+  if [ -f "gradlew" ] || find . -maxdepth 3 \\( -name "*.gradle" -o -name "*.gradle.kts" \\) 2>/dev/null | grep -q .; then
     PLATFORM="android"
   elif find . -maxdepth 3 -name "*.xcodeproj" -type d 2>/dev/null | grep -q .; then
     PLATFORM="ios"
@@ -7703,8 +8356,12 @@ if [[ "$PLATFORM" == "android" && "$FILE_PATH" == *.kt ]]; then
       exit $STATUS
     fi
   elif [ -f "gradlew" ]; then
+    # Derive the Gradle module path from the file path (e.g. app/src/… → :app).
+    # Fix: use proper shell variable expansion — the original had \\{MODULE\\} (escaped
+    # braces leaked from the JS generator), which expanded to the literal string
+    # "\${MODULE}" instead of the variable value.
     MODULE=$(echo "$FILE_PATH" | sed 's|/src/.*||' | sed 's|^\\./||' | sed 's|/|:|g')
-    ./gradlew ":$\\{MODULE\\}:ktlintCheck" --quiet 2>&1 | tail -20
+    ./gradlew ":\${MODULE}:ktlintCheck" --quiet 2>&1 | tail -20
     STATUS=\${PIPESTATUS[0]}
     if [ $STATUS -ne 0 ]; then
       echo "❌ ktlint check failed — run './gradlew ktlintFormat' to auto-fix." >&2
@@ -7715,7 +8372,9 @@ fi
 
 if [[ "$PLATFORM" == "ios" && "$FILE_PATH" == *.swift ]]; then
   if command -v swiftlint &>/dev/null; then
-    swiftlint lint --quiet --path "$FILE_PATH" 2>&1
+    # Fix: \`swiftlint lint --path\` was removed in SwiftLint 0.52+.
+    # Pass the file as a positional argument instead.
+    swiftlint lint --quiet "$FILE_PATH" 2>&1
     STATUS=$?
     if [ $STATUS -ne 0 ]; then
       echo "❌ SwiftLint failed on $FILE_PATH — fix the violations above before continuing." >&2
@@ -7735,7 +8394,11 @@ const EMBEDDED_DONE_GATE_SH = `#!/usr/bin/env bash
 VIOLATIONS=()
 
 if git rev-parse --git-dir &>/dev/null; then
-  MODIFIED=$(git diff --name-only 2>/dev/null; git diff --cached --name-only 2>/dev/null)
+  # Include untracked files — a newly created file in a protected dir is just as
+  # problematic as a modification to an existing one.
+  MODIFIED=$(git diff --name-only 2>/dev/null
+             git diff --cached --name-only 2>/dev/null
+             git ls-files --others --exclude-standard 2>/dev/null)
 
   while IFS= read -r f; do
     [ -z "$f" ] && continue
@@ -7948,6 +8611,8 @@ function _goTo(id) {
     const src = document.getElementById('cfg-package')?.value.trim();
     const dst = document.getElementById('conv-package');
     if (dst && !dst.value && src) dst.value = src;
+    // Re-render CI drift banner (may have been populated after analyzeProject ran)
+    if (typeof renderCIDriftBanner === 'function') renderCIDriftBanner(state.ciDrift || []);
   }
   if (step.file) {
     updatePreview(id);
@@ -8281,21 +8946,27 @@ async function detectExistingOutputFiles(handle) {
 
   if (completedCount === 0) return;
 
-  // Update or inject the setup-status banner on the welcome screen
-  const allDone = completedCount === contentSteps.length;
-  showSetupBanner(completedCount, contentSteps.length, allDone);
-
   // Compare the project's stored snapshot version against the current skeleton.
   // Surface an update banner when the project is on an older version OR predates
-  // versioning entirely (no .sdd-version manifest — set up before this feature).
-  const manifestRaw = await tryReadFile(handle, 'agent-artifacts', '.sdd-version');
+  // versioning entirely (no manifest — set up before this feature).
+  // Prefer .sdd-manifest.json (v1.4+); fall back to legacy .sdd-version.
+  const manifestRaw = await tryReadFile(handle, 'agent-artifacts', '.sdd-manifest.json')
+    || await tryReadFile(handle, 'agent-artifacts', '.sdd-version');
   let storedVersion = null;
   if (manifestRaw) {
     try { storedVersion = JSON.parse(manifestRaw).version ?? null; } catch { storedVersion = null; }
   }
-  if (storedVersion !== SKELETON_VERSION) {
+  const updateAvailable = storedVersion !== SKELETON_VERSION;
+
+  if (updateAvailable) {
+    // Update banner takes priority — suppress the setup-status banner so only
+    // one message competes for attention on the welcome screen at a time.
     // storedVersion === null = legacy project set up before versioning existed.
     showUpdateBanner(storedVersion, SKELETON_VERSION);
+  } else {
+    // Project is current — show progress/completion status instead.
+    const allDone = completedCount === contentSteps.length;
+    showSetupBanner(completedCount, contentSteps.length, allDone);
   }
 }
 
@@ -8311,6 +8982,59 @@ function compareVersions(a, b) {
   return 0;
 }
 
+// djb2 hash — fast, collision-resistant enough for change detection (not crypto).
+// Returns an 8-hex-char string so it's compact in the manifest JSON.
+function hashStr(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = (((h << 5) + h) ^ s.charCodeAt(i)) >>> 0;
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+
+// Read a file from agent-artifacts/ using the current state.dirHandle.
+// Returns the file text, or null if the file doesn't exist or can't be read.
+async function readArtifactFile(relativePath) {
+  if (!state.dirHandle) return null;
+  try {
+    const sddDir = state.dirHandle.name === 'agent-artifacts'
+      ? state.dirHandle
+      : await state.dirHandle.getDirectoryHandle('agent-artifacts', { create: false });
+    return await tryReadFile(sddDir, ...relativePath.split('/'));
+  } catch { return null; }
+}
+
+// Merges a new framework version of CLAUDE.md with an existing project copy.
+// Preserves the custom section (between sdd:custom:start/end markers) if present.
+// If the existing file has no markers (legacy project), overwrites completely — the
+// custom section hasn't been set up yet and there's nothing to preserve.
+function mergeCLAUDEMD(existing, newFramework) {
+  const CUSTOM_START = '<!-- sdd:custom:start';
+  const CUSTOM_END   = '<!-- sdd:custom:end -->';
+
+  const existingStartIdx = existing.indexOf(CUSTOM_START);
+  const existingEndIdx   = existing.indexOf(CUSTOM_END);
+
+  // Legacy file — no markers yet. Overwrite fully (first update).
+  if (existingStartIdx === -1 || existingEndIdx === -1) return newFramework;
+
+  // Extract everything from sdd:custom:start to the end (inclusive of end marker + trailing newline)
+  const customBlock = existing.slice(existingStartIdx, existingEndIdx + CUSTOM_END.length + 1);
+
+  // Find where the custom section begins in the new framework content.
+  const newStartIdx = newFramework.indexOf(CUSTOM_START);
+  if (newStartIdx === -1) {
+    // New framework doesn't have the custom marker (shouldn't happen post-v1.4) — append.
+    return newFramework + '\n' + customBlock;
+  }
+
+  // Replace the new framework's empty custom section with the user's preserved content.
+  const newEndIdx = newFramework.indexOf(CUSTOM_END, newStartIdx);
+  const frameworkBefore = newFramework.slice(0, newStartIdx);
+  const frameworkAfter  = newEndIdx !== -1
+    ? newFramework.slice(newEndIdx + CUSTOM_END.length)
+    : '';
+  return frameworkBefore + customBlock + frameworkAfter;
+}
+
 // Changelog entries the project would gain by updating: every version newer than
 // `stored`. If `stored` is null/non-numeric (legacy project), return all entries.
 // Sorted newest-first.
@@ -8324,28 +9048,45 @@ function changelogSince(stored) {
 }
 
 // Render the "What's new" list (versions gained by updating) as banner HTML.
+// Collapsed by default — user clicks "What's new ▾" to expand.
 function renderWhatsNew(stored) {
   const entries = changelogSince(stored);
   if (!entries.length) return '';
+  const id = 'whatsNewBody_' + Math.random().toString(36).slice(2);
+  const toggleId = 'whatsNewToggle_' + Math.random().toString(36).slice(2);
   const blocks = entries.map(e => {
-    const items = e.notes.map(n => `<li style="margin:2px 0">${n}</li>`).join('');
-    return `<div style="margin-top:8px">
+    const items = e.notes.map(n => `<li style="margin:3px 0">${n}</li>`).join('');
+    return `<div style="margin-top:10px">
         <div style="font-size:11px;font-weight:700;color:#fb923c">v${e.version}${e.date ? ` · ${e.date}` : ''}</div>
-        <ul style="margin:4px 0 0;padding-left:18px;font-size:11px;color:var(--text-muted);line-height:1.5;text-align:left">${items}</ul>
+        <ul style="margin:4px 0 0;padding-left:18px;font-size:11px;color:var(--text-muted);line-height:1.6;text-align:left">${items}</ul>
       </div>`;
   }).join('');
+  const versionCount = entries.length;
+  const versionLabel = versionCount === 1
+    ? `v${entries[0].version}`
+    : `v${entries[entries.length - 1].version} → v${entries[0].version}`;
   return `<div style="margin-top:10px;border-top:1px solid rgba(251,146,60,0.25);padding-top:8px">
-      <div style="font-size:11px;font-weight:700;color:#fb923c;text-transform:uppercase;letter-spacing:0.5px">What's new</div>
-      ${blocks}
+      <button id="${toggleId}" onclick="
+        var body = document.getElementById('${id}');
+        var open = body.style.display !== 'none';
+        body.style.display = open ? 'none' : 'block';
+        this.innerHTML = open
+          ? 'What\\'s new (${versionLabel}) &nbsp;▾'
+          : 'What\\'s new (${versionLabel}) &nbsp;▴';
+      " style="background:none;border:none;color:#fb923c;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;cursor:pointer;padding:0">
+        What's new (${versionLabel}) &nbsp;▾
+      </button>
+      <div id="${id}" style="display:none">${blocks}</div>
     </div>`;
 }
 
-// Amber "update available" banner shown when the project's .sdd-version manifest
-// is older than the skeleton bundled with this wizard. Re-running setup (saving
-// the final step) rewrites CLAUDE.md, hooks, and the manifest to the new version.
+// Amber "update available" banner shown when the project's manifest version
+// is older than the skeleton bundled with this wizard. Clicking "Update now"
+// hash-checks each base file, merges CLAUDE.md, and shows a conflict dialog
+// for any files the user has modified — nothing is silently overwritten.
 function showUpdateBanner(stored, current) {
   document.getElementById('sddUpdateBanner')?.remove();
-
+  document.getElementById('setupStatusBanner')?.remove();   // one banner at a time
   const welcome = document.getElementById('screen-welcome');
   if (!welcome) return;
 
@@ -8359,7 +9100,7 @@ function showUpdateBanner(stored, current) {
       <span style="font-size:22px">🔄</span>
       <div style="flex:1">
         <div style="font-size:13px;font-weight:600;color:#fb923c">Update available — this project uses an older SDD snapshot</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Project version <code>${storedLabel}</code> → skeleton version <code>${current}</code>. Updating rewrites <code>CLAUDE.md</code>, the hooks, and templates in <code>agent-artifacts/</code>. Your spec-kit and context files are <strong>not</strong> touched.</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Project version <code>${storedLabel}</code> → skeleton version <code>${current}</code>. The wizard hash-checks each base file before writing — files you've modified are never silently overwritten. Your spec-kit and context files are <strong>not</strong> touched.</div>
       </div>
       <button id="sddUpdateBtn" style="flex-shrink:0;background:#fb923c;color:#1a1a1a;border:none;border-radius:var(--radius);padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer">Update now</button>
     </div>
@@ -8377,6 +9118,7 @@ function showUpdateBanner(stored, current) {
 // wizard can only write inside the granted agent-artifacts/ folder.
 function showUpdateDoneBanner(version) {
   document.getElementById('sddUpdateBanner')?.remove();
+  document.getElementById('setupStatusBanner')?.remove();   // one banner at a time
   const welcome = document.getElementById('screen-welcome');
   if (!welcome) return;
 
@@ -8429,6 +9171,124 @@ function showSetupBanner(done, total, allDone) {
   else welcome.insertBefore(banner, welcome.firstChild);
 }
 
+// ── Conflict resolution state ─────────────────────────────────────────────────
+// Populated by showConflictModal; consumed by resolveConflict + applyConflictDecisions.
+let _pendingConflicts  = [];   // { path, newContent }[]
+let _conflictDecisions = {};   // path → 'skip' | 'overwrite'
+
+// Shows a modal listing files the wizard detected as user-modified.
+// For each file the user can Skip (keep their version) or Overwrite (take new).
+// Decisions are applied and the manifest updated when "Done" is clicked.
+function showConflictModal(conflicts) {
+  document.getElementById('sddConflictModal')?.remove();
+
+  _pendingConflicts  = conflicts;
+  _conflictDecisions = {};
+  // Default decision: skip (safe)
+  conflicts.forEach(c => { _conflictDecisions[c.path] = 'skip'; });
+
+  const cards = conflicts.map((c, idx) => `
+    <div id="sddConflictCard_${idx}" style="background:var(--surface2);border:1px solid rgba(251,146,60,0.35);border-radius:10px;padding:14px 18px;margin-bottom:12px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px">
+        <div>
+          <code style="font-size:12px;color:#fb923c">agent-artifacts/${escHtml(c.path)}</code>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">This file differs from the version the wizard last wrote — you've modified it.</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0">
+          <button id="sddSkip_${idx}" onclick="setConflictDecision(${idx},'skip')"
+            style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--accent);color:#fff;font-size:11px;font-weight:600;cursor:pointer">
+            Skip (keep mine)
+          </button>
+          <button id="sddOver_${idx}" onclick="setConflictDecision(${idx},'overwrite')"
+            style="padding:5px 12px;border-radius:6px;border:none;background:var(--bg);color:var(--text);font-size:11px;cursor:pointer">
+            Overwrite
+          </button>
+        </div>
+      </div>
+      <details>
+        <summary style="font-size:11px;color:var(--text-muted);cursor:pointer;user-select:none">▸ Show new framework version</summary>
+        <pre style="margin:8px 0 0;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-family:var(--mono);font-size:10px;overflow-x:auto;white-space:pre-wrap;max-height:180px;overflow-y:auto;color:var(--text-muted)">${escHtml(c.newContent.slice(0, 2000))}${c.newContent.length > 2000 ? '\n…(truncated)' : ''}</pre>
+      </details>
+    </div>`).join('');
+
+  const modal = document.createElement('div');
+  modal.id = 'sddConflictModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
+  modal.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;
+      padding:28px 32px;max-width:680px;width:100%;max-height:90vh;overflow-y:auto;
+      box-shadow:0 16px 48px rgba(0,0,0,0.5)">
+      <div style="font-size:15px;font-weight:700;color:#fb923c;margin-bottom:4px">
+        ⚠️ ${conflicts.length} modified file${conflicts.length > 1 ? 's' : ''} need your decision
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:20px;line-height:1.6">
+        <strong>Skip (keep mine)</strong> — leaves your version untouched.<br>
+        <strong>Overwrite</strong> — replaces your version with the new framework file.
+      </div>
+      ${cards}
+      <div style="text-align:right;margin-top:6px">
+        <button onclick="applyConflictDecisions()"
+          style="padding:9px 24px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:700;cursor:pointer">
+          Done — apply decisions
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+// Flips the visual state of Skip/Overwrite buttons and records the decision.
+function setConflictDecision(idx, choice) {
+  const conflict = _pendingConflicts[idx];
+  if (!conflict) return;
+  _conflictDecisions[conflict.path] = choice;
+
+  const skipBtn = document.getElementById(`sddSkip_${idx}`);
+  const overBtn = document.getElementById(`sddOver_${idx}`);
+  if (!skipBtn || !overBtn) return;
+
+  if (choice === 'skip') {
+    skipBtn.style.background = 'var(--accent)';  skipBtn.style.color = '#fff';
+    overBtn.style.background = 'var(--bg)';       overBtn.style.color = 'var(--text)';
+  } else {
+    overBtn.style.background = '#ef4444';  overBtn.style.color = '#fff';
+    skipBtn.style.background = 'var(--bg)'; skipBtn.style.color = 'var(--text)';
+  }
+}
+
+// Applies all Skip/Overwrite decisions, updates .sdd-manifest.json, and closes the modal.
+async function applyConflictDecisions() {
+  const modal = document.getElementById('sddConflictModal');
+  if (modal) { modal.style.pointerEvents = 'none'; modal.style.opacity = '0.6'; }
+
+  const manifestRaw = await readArtifactFile('.sdd-manifest.json');
+  let manifest = null;
+  try { if (manifestRaw) manifest = JSON.parse(manifestRaw); } catch {}
+  if (!manifest) manifest = { version: SKELETON_VERSION, generated: new Date().toISOString(), files: {} };
+
+  let overwritten = 0;
+  for (const conflict of _pendingConflicts) {
+    const decision = _conflictDecisions[conflict.path] || 'skip';
+    if (decision === 'overwrite') {
+      const ok = await saveFile(conflict.path, conflict.newContent);
+      if (ok) {
+        manifest.files[conflict.path] = { hash: hashStr(conflict.newContent), version: SKELETON_VERSION };
+        overwritten++;
+      }
+    }
+    // skip → leave existing file and existing manifest hash entry as-is
+  }
+
+  manifest.generated = new Date().toISOString();
+  await saveFile('.sdd-manifest.json', JSON.stringify(manifest, null, 2) + '\n');
+
+  document.getElementById('sddConflictModal')?.remove();
+
+  const skipped = _pendingConflicts.length - overwritten;
+  showToast(`Conflicts resolved: ${overwritten} updated, ${skipped} kept.`, 'success');
+  _pendingConflicts  = [];
+  _conflictDecisions = {};
+}
+
 function loadExistingConfig(text) {
   const get = key => text.match(new RegExp(`^${key}:\\s*(.+)`, 'm'))?.[1]?.trim() ?? '';
 
@@ -8453,7 +9313,7 @@ async function tryReadFile(dirHandle, ...parts) {
   } catch { return null; }
 }
 
-async function countSourceFiles(dirHandle, maxDepth = 4) {
+async function countSourceFiles(dirHandle, maxDepth = 8) {
   const counts = { kt: 0, java: 0 };
   async function walk(dh, depth) {
     if (depth <= 0) return;
@@ -8496,6 +9356,61 @@ async function saveFile(relativePath, content) {
   }
 }
 
+// Writes a file to .claude/ in the project root (creates subdirectories as needed).
+// Used for skills and commands the wizard installs so Claude Code picks them up automatically.
+// Only works when the project root was selected — skipped silently when agent-artifacts/ was
+// selected directly (we don't know the project root in that case).
+async function saveDotClaudeFile(relativePath, content) {
+  if (!state.dirHandle) return false;
+  if (state.dirHandle.name === 'agent-artifacts') return false;
+  try {
+    const dotClaude = await state.dirHandle.getDirectoryHandle('.claude', { create: true });
+    const parts = relativePath.split('/');
+    let dir = dotClaude;
+    for (let i = 0; i < parts.length - 1; i++) {
+      dir = await dir.getDirectoryHandle(parts[i], { create: true });
+    }
+    const fileHandle = await dir.getFileHandle(parts[parts.length - 1], { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(content);
+    await writable.close();
+    return true;
+  } catch (e) {
+    console.error('saveDotClaudeFile:', e);
+    return false;
+  }
+}
+
+// Reads a file from .claude/ in the project root. Returns text or null.
+async function readDotClaudeFile(relativePath) {
+  if (!state.dirHandle || state.dirHandle.name === 'agent-artifacts') return null;
+  try {
+    const dotClaude = await state.dirHandle.getDirectoryHandle('.claude', { create: false });
+    return await tryReadFile(dotClaude, ...relativePath.split('/'));
+  } catch { return null; }
+}
+
+// Writes a file directly to the project root (state.dirHandle), NOT inside agent-artifacts/.
+// Used for the root CLAUDE.md shim so `claude` auto-loads the protocol without
+// the developer needing the magic "Read agent-artifacts/CLAUDE.md" prompt.
+// Only works when the project root was selected (not when agent-artifacts/ was selected directly).
+async function saveRootFile(filename, content) {
+  if (!state.dirHandle) return false;
+  // If the user pointed the wizard at agent-artifacts/ directly we don't know
+  // the project root, so skip rather than write in the wrong place.
+  if (state.dirHandle.name === 'agent-artifacts') return false;
+  try {
+    const fileHandle = await state.dirHandle.getFileHandle(filename, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(content);
+    await writable.close();
+    return true;
+  } catch (e) {
+    console.error('saveRootFile:', e);
+    return false;
+  }
+}
+
 // Initialise base files for a brand-new project ONLY. If agent-artifacts/CLAUDE.md
 // already exists the project is considered initialised and is left untouched — the
 // user refreshes it explicitly via the "Update now" button on the update banner.
@@ -8524,21 +9439,33 @@ async function runSkeletonUpdate() {
   console.log('   chmod +x .claude/scripts/*.sh');
 }
 
+// Files the wizard seeds once and then NEVER overwrites on subsequent updates.
+// Users are expected to add project-specific content to these files (e.g. module
+// rows in _index.md). The wizard only writes them when they don't exist yet.
+const SEED_ONLY_PATHS = new Set([
+  'context/_index.md',   // user adds module rows — must never be clobbered on update
+]);
+
 // Writes all project-agnostic base files to agent-artifacts/.
 // Called by maybeInitBaseArtifacts (new projects), runSkeletonUpdate (explicit
 // update), and when the final wizard step is saved. Safe to call repeatedly.
+//
+// File categories and their update behaviour:
+//  ① CLAUDE.md         — always smart-merged: new framework section + preserved custom section.
+//  ② Seed-only files   — written only when the file doesn't exist yet; never overwritten.
+//  ③ Framework files   — hash-compared vs .sdd-manifest.json before overwriting:
+//                         • hash matches (or no stored hash) → safe to overwrite.
+//                         • hash differs → user modified → queue for conflict UI.
+//  New projects (no manifest) → all files written unconditionally (first setup).
 async function writeBaseArtifacts(silent = false) {
   if (!state.dirHandle || !hasFSA) return;
 
-  const files = [
+  const baseFiles = [
     ['CLAUDE.md',                          EMBEDDED_CLAUDE_MD],
     ['tasks/TASK_TEMPLATE.md',             EMBEDDED_TASK_TEMPLATE],
     ['tasks/BOOTSTRAP_TEMPLATE.md',        EMBEDDED_BOOTSTRAP_TEMPLATE],
     ['context/TEMPLATE.md',                EMBEDDED_CONTEXT_TEMPLATE],
     ['context/_index.md',                  EMBEDDED_CONTEXT_INDEX],
-    ['skills/_index.md',                   EMBEDDED_SKILLS_INDEX],
-    ['skills/ada.md',                      EMBEDDED_SKILL_ADA],
-    ['skills/analytics.md',                EMBEDDED_SKILL_ANALYTICS],
     ['hooks/settings.json',                EMBEDDED_HOOKS_SETTINGS],
     ['hooks/scripts/protected-paths.sh',   EMBEDDED_PROTECTED_PATHS_SH],
     ['hooks/scripts/git-guard.sh',         EMBEDDED_GIT_GUARD_SH],
@@ -8546,22 +9473,100 @@ async function writeBaseArtifacts(silent = false) {
     ['hooks/scripts/done-gate.sh',         EMBEDDED_DONE_GATE_SH],
   ];
 
+  // Load the stored manifest so we know which files the wizard last wrote.
+  // Prefer .sdd-manifest.json (v1.4+); fall back to legacy .sdd-version.
+  const manifestRaw = await readArtifactFile('.sdd-manifest.json')
+    || await readArtifactFile('.sdd-version');
+  let storedManifest = null;
+  try { if (manifestRaw) storedManifest = JSON.parse(manifestRaw); } catch {}
+  const storedHashes = storedManifest?.files || {};
+  const isNewProject  = !storedManifest; // no manifest at all → brand-new setup
+
   let failed = 0;
-  for (const [path, content] of files) {
-    const ok = await saveFile(path, content);
+  const conflicts  = [];    // { path, newContent } — user-modified files needing resolution
+  const newHashes  = {};    // path → hash of what the wizard just wrote (or tried to)
+
+  for (const [path, newContent] of baseFiles) {
+    // ── ① CLAUDE.md: always smart-merge (preserve custom section) ────────────
+    if (path === 'CLAUDE.md') {
+      const existing = await readArtifactFile('CLAUDE.md');
+      const merged   = existing ? mergeCLAUDEMD(existing, newContent) : newContent;
+      const ok       = await saveFile(path, merged);
+      if (!ok) failed++;
+      else newHashes[path] = hashStr(newContent); // hash of framework section only
+      continue;
+    }
+
+    // ── ② Seed-only files: write once, never overwrite on update ─────────────
+    if (SEED_ONLY_PATHS.has(path)) {
+      const existing = await readArtifactFile(path);
+      if (!existing) {
+        // File doesn't exist yet — seed it
+        const ok = await saveFile(path, newContent);
+        if (!ok) failed++;
+        // Not tracked in manifest — the wizard never checks hashes for seed-only files
+      }
+      // Already exists → leave it untouched (user owns this file)
+      continue;
+    }
+
+    // ── ③ Framework files: hash-check on updates, write freely on first setup ─
+    if (!isNewProject) {
+      const stored = storedHashes[path]?.hash;
+      if (stored != null) {
+        const existing = await readArtifactFile(path);
+        if (existing != null && hashStr(existing) !== stored) {
+          // User has modified this file since the wizard last wrote it.
+          conflicts.push({ path, newContent });
+          // Keep the old hash in the manifest for now — resolved in conflict UI.
+          newHashes[path] = stored;
+          continue;
+        }
+      }
+    }
+
+    const ok = await saveFile(path, newContent);
     if (!ok) failed++;
+    else newHashes[path] = hashStr(newContent);
   }
 
-  // Stamp a version manifest so a later wizard run can detect when this
-  // project's snapshot is older than the current skeleton (update banner).
-  const manifest = JSON.stringify({
+  // Write the new manifest (.sdd-manifest.json) with per-file hashes.
+  const newManifest = JSON.stringify({
     version: SKELETON_VERSION,
     generated: new Date().toISOString(),
+    files: Object.fromEntries(
+      Object.entries(newHashes).map(([k, hash]) => [k, { hash, version: SKELETON_VERSION }])
+    ),
   }, null, 2) + '\n';
-  if (!await saveFile('.sdd-version', manifest)) failed++;
+  if (!await saveFile('.sdd-manifest.json', newManifest)) failed++;
+
+  // Write a thin CLAUDE.md shim to the project root so `claude` auto-loads the
+  // protocol without the magic "Read agent-artifacts/CLAUDE.md" prompt.
+  // Only written when the project root was selected (not agent-artifacts/ directly).
+  await saveRootFile('CLAUDE.md', ROOT_CLAUDE_MD_SHIM);
+
+  // ── Write Claude Code skills and commands to .claude/ ─────────────────────
+  // These are seed-only: written if the file doesn't already exist, never
+  // overwritten after that (the user owns them once installed). If the user
+  // wants a fresh copy they can delete the file and re-run setup/update.
+  const dotClaudeFiles = [
+    ['skills/android-pr-review/SKILL.md', EMBEDDED_ANDROID_PR_SKILL],
+    ['commands/android-pr-review.md',     EMBEDDED_ANDROID_PR_COMMAND],
+  ];
+  for (const [path, content] of dotClaudeFiles) {
+    const existing = await readDotClaudeFile(path);
+    if (!existing) await saveDotClaudeFile(path, content);
+  }
+
+  // ── Show conflict UI if any files need user decisions ─────────────────────
+  if (conflicts.length > 0) {
+    showConflictModal(conflicts);
+  }
 
   if (!silent) {
-    if (failed === 0) {
+    if (conflicts.length > 0) {
+      showToast(`✅ Update applied — ${conflicts.length} modified file${conflicts.length > 1 ? 's need' : ' needs'} your decision (see conflict dialog).`, 'info');
+    } else if (failed === 0) {
       showToast('✅ Base files written — CLAUDE.md, tasks, context, and hooks are ready.', 'success');
     } else {
       showToast(`⚠️  ${failed} file(s) could not be written — check console`, 'info');
@@ -8847,6 +9852,7 @@ function showPreview(content) {
 function esc(str) {
   return String(str)
     .replace(/&/g, '&amp;')
+    .replace(/'/g, '&#x27;')
     .replace(/"/g, '&quot;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
@@ -8975,6 +9981,34 @@ function updateDoneScreen() {
            The agent will work now — fill these in when you're ready to improve accuracy.
          </div>`
       : '');
+
+  // ── Required next step: hook installation ─────────────────────────────────
+  // Previously only printed to the browser console — invisible to most teams.
+  // Now shown prominently in the Done screen so it cannot be missed.
+  const nextStepsEl = screen.querySelector('.done-next-steps');
+  if (nextStepsEl) {
+    nextStepsEl.innerHTML = `
+      <div style="margin-top:20px;padding:14px 16px;
+           background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.35);
+           border-radius:10px;text-align:left">
+        <div style="font-size:12px;font-weight:700;color:#f59e0b;margin-bottom:8px;
+             display:flex;align-items:center;gap:6px">
+          ⚠️ Required: Install Claude Code hooks
+        </div>
+        <div style="font-size:12px;color:var(--text-dim);line-height:1.6;margin-bottom:10px">
+          Without this step the agent runs with <strong>no protection</strong> —
+          nothing stops it from committing, modifying spec-kit files, or bypassing the quality gate.
+          Run this once from your project root terminal:
+        </div>
+        <code style="display:block;background:var(--bg);border:1px solid var(--border);
+             border-radius:6px;padding:8px 12px;font-size:11px;color:var(--text);
+             white-space:pre;overflow-x:auto">cp -r agent-artifacts/hooks/.  .claude/
+chmod +x .claude/scripts/*.sh</code>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:8px">
+          Commit <code>.claude/</code> alongside <code>agent-artifacts/</code> so the hooks apply for the whole team.
+        </div>
+      </div>`;
+  }
 }
 
 function updatePreview(stepId) {
@@ -9100,6 +10134,7 @@ function init() {
       <h2>Setup Complete!</h2>
       <p>All spec-kit files have been generated. Your SDD skeleton is ready. Fill in the remaining placeholder values in each file, then run your first task.</p>
       <div class="done-files"></div>
+      <div class="done-next-steps"></div>
       <button class="btn btn-primary" onclick="goTo('welcome')">← Start Over</button>
     </div>
   </div>`;
@@ -9520,6 +10555,14 @@ function choosePlatform(name) {
   if (isEmbedded) {
     // Inline execution: script.textContent runs synchronously on appendChild —
     // no onload/onerror events fire. Proceed with the post-load logic directly.
+
+    // Inject shared helpers first (platform-common.js) so platform modules can call them.
+    if (EMBEDDED_PLATFORM_COMMON && !EMBEDDED_PLATFORM_COMMON.startsWith('placeholder')) {
+      const commonScript = document.createElement('script');
+      commonScript.textContent = EMBEDDED_PLATFORM_COMMON;
+      document.head.appendChild(commonScript);
+    }
+
     const script = document.createElement('script');
     script.textContent = platformCode;
     document.head.appendChild(script);
@@ -9528,6 +10571,11 @@ function choosePlatform(name) {
     showFolderInterstitial(name);
   } else {
     // Fallback: dynamic src load (works over HTTP, fails on file://).
+    // Load common helpers first, then the platform module.
+    const commonScript = document.createElement('script');
+    commonScript.src = 'engine/platform-common.js';
+    document.head.appendChild(commonScript);
+
     const script = document.createElement('script');
     script.src = 'engine/platform-' + name + '.js';
     script.onload = () => {

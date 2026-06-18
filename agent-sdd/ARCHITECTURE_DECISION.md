@@ -254,6 +254,6 @@ But we believe this approach is correct for long-term maintainability.
 ## Sign-Off
 
 ✅ **Implementation Complete**  
-✅ **Tests Pass**  
+⚠️ **Tests**: No automated test suite exists for the wizard engine. The parser and detection logic are manually verified. A Node.js test suite is tracked as a known gap.  
 ✅ **Documentation Updated**  
 ✅ **Ready for Production**

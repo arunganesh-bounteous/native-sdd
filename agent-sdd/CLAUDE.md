@@ -19,6 +19,8 @@
 #    wizard-core.js (EMBEDDED_CLAUDE_MD). Never hand-edit the embedded copy.
 # ─────────────────────────────────────────────────────────────────────────────
 
+<!-- sdd:framework:start — managed by SDD wizard. Run "Update now" in the wizard to refresh this section. -->
+
 ## Agentic AI Principles — Read This First
 
 You are an **autonomous AI agent**, not a one-shot code generator.
@@ -103,7 +105,6 @@ This SDD skeleton gives you everything you need to work accurately and safely:
 - Project configuration (`agent-artifacts/project.config.md`)
 - Architecture knowledge (`agent-artifacts/spec-kit/`)
 - Per-module living docs (`agent-artifacts/context/`)
-- Optional plug-n-play skills (`agent-artifacts/skills/`) — activated per ticket
 - The task to execute (`agent-artifacts/tasks/<TICKET-ID>.md`)
 
 **Directory layout:**
@@ -189,7 +190,7 @@ in that area, not a blocking error.
 | 3 | `agent-artifacts/context/_index.md` → match task keywords → load `agent-artifacts/context/<module>.md` for each match | Load if present — if `_index.md` is missing, skip Tier 3 entirely |
 | 4 | Relevant sections of `agent-artifacts/spec-kit/TECH_DEBT.md` | If present and touching legacy code or files listed in debt register |
 | 5 | Relevant sections of `agent-artifacts/spec-kit/DATA_MODEL.md` | If present and task touches data models, APIs, DB, or network |
-| 6 | Source files listed in the loaded context files that are expected to change | Per task |
+| 6 | Source files listed in the loaded context files that are expected to change — **read their actual current content now**, before forming any plan | Per task |
 
 **Missing file behaviour:**
 - Tier 1 missing → state in Understanding: "ARCHITECTURE.md / MODULE_MAP.md not found — proceeding without structural context"
@@ -201,20 +202,34 @@ in that area, not a blocking error.
 context files (Tier 3) before reading any source files.
 
 **Context freshness check (do this for every Tier 3 context file you load):**
-A context file is a snapshot — code may have changed since it was written, by a human
-or another agent. Before you trust its contents:
+A context file is a snapshot — code changes every sprint but context only updates when an
+agent task touches that module. Before you use its contents:
 1. Read the **Key Files** table in the context file.
 2. Verify each listed path still exists (relative to `codebase_path`).
-3. **If every Key File exists → trust the context** and proceed normally.
-4. **If any Key File is missing or renamed → treat the context as STALE.** Do not trust its
-   file paths, state shapes, or "Key Files" list. Re-derive from reality: read the actual
-   source at the module's `Path` (per `MODULE_MAP.md`), proceed using what you observe, and
-   record `**Context status:** stale — re-derived from source` in your Understanding.
-   You MUST refresh that context file in Step 7 (correct the Key Files table and any
-   state/behaviour that changed).
+3. **If every Key File exists → the context is navigable.** Use it to know where to look
+   and what patterns to expect — not as a substitute for reading actual source.
+4. **If any Key File is missing or renamed → treat the context as STALE.** Re-derive from
+   reality: read the actual source at the module's `Path` (per `MODULE_MAP.md`), proceed
+   using what you observe, and record `**Context status:** stale — re-derived from source`
+   in your Understanding. You MUST refresh that context file in Step 7.
 
-Do not silently rely on a context file whose Key Files no longer exist — a confidently wrong
-map is worse than no map. When in doubt, verify against source before acting.
+**What to trust from context vs what to always verify from source:**
+
+| Trust from context — changes rarely | Always verify from source — changes every sprint |
+|--------------------------------------|--------------------------------------------------|
+| Module purpose and boundaries | Exact function / method signatures |
+| Dependency graph (what imports what) | State shapes (sealed classes, data classes) |
+| DI setup and entry points | Which files currently exist in the module |
+| Known Debt entries | What a function actually does today |
+| "What the Agent Should Know" gotchas | Constructor parameters and field names |
+| Architectural patterns in use | Test file locations |
+
+**Rule: never write code against a state shape, function signature, or implementation
+detail you have not read from actual source in this session.** Context tells you where
+to look — source tells you what is there.
+
+Do not silently rely on a context file whose Key Files no longer exist — a confidently
+wrong map is worse than no map. When in doubt, verify against source before acting.
 
 **Module not in context/:** Check `agent-artifacts/spec-kit/MODULE_MAP.md` by module name.
 Use the `Path` field as the source of truth for where to find the code — this may be a
@@ -239,29 +254,12 @@ Read the task file the developer has provided (e.g., `agent-artifacts/tasks/[PRO
 Extract:
 - Ticket ID and title
 - Type (Feature / Bug / Refactor / Task)
-- **Skills** (the `Skills:` line — see "Skills (plug-n-play)" below)
 - Description
 - Acceptance criteria (these are your definition of done)
 - Out of scope (treat these as hard constraints — do not implement them)
 - Affected areas (use to confirm or expand Tier 3 context loading)
 - Testing requirements
 - Any designs or reference links
-
-### Skills (plug-n-play)
-
-A skill is an **optional instruction module** that adds requirements for a single ticket.
-Skills are **off by default**.
-
-1. Read the task's `Skills:` line. If it is missing or says `none` → no skills active; run the
-   normal workflow unchanged.
-2. For each skill named, load `agent-artifacts/skills/<skill>.md` (the registry of available
-   skills is `agent-artifacts/skills/_index.md`).
-3. Apply each active skill's rules **on top of** Steps 3–8 — typically an added line in your
-   Understanding (Step 3), extra checks in Self-Verification (Step 6), and an extra section in
-   the completion report (Step 8). Each skill file states exactly what it adds.
-4. A skill only **adds** requirements — it never relaxes a Hard Rule or the base quality gate.
-5. If a named skill has no matching file in `agent-artifacts/skills/`, note the gap in your
-   Understanding and continue — do not stop.
 
 ---
 
@@ -318,10 +316,16 @@ If the task MD is silent AND `default_tests: N` → ask: "Do you want tests for 
 Write code following `agent-artifacts/spec-kit/CONVENTIONS.md` and `agent-artifacts/spec-kit/MIGRATION_RULES.md` exactly.
 Apply `agent-artifacts/spec-kit/TESTING.md` for all test files.
 
+**Read before you write.** Before modifying any existing file, read its current content
+from source — even if a context file already describes it. Context describes the module
+as it was when last updated; source is what it is right now. Writing code against a stale
+mental model is the most common cause of agent errors. No exceptions.
+
 **Execution order:**
-1. Create new files first (models, repositories, use cases)
-2. Modify existing files
-3. Write test files last (or interleaved per TDD if specified)
+1. Read all files you plan to modify (Tier 6 if not done yet)
+2. Create new files first (models, repositories, use cases)
+3. Modify existing files
+4. Write test files last (or interleaved per TDD if specified)
 
 ---
 
@@ -399,10 +403,6 @@ Scan every file you created or modified against the checks for your platform:
 | Tests follow TESTING.md naming | `functionName_scenario_expectedResult` |
 
 For each failure found: **fix it before proceeding.** Log what you fixed under Self-Corrections.
-
-**Active skills:** if the task activated any skills (Step 2), run each active skill's own gate now
-as well (e.g. the Accessibility Gate, the Analytics Gate). Their checks are additional to — never a
-replacement for — the base quality gate above.
 
 ### 6d — Security Scan (warn only — NEVER fix)
 
@@ -578,7 +578,7 @@ The project's `.claude/settings.json` (installed from `agent-artifacts/hooks/`) 
 | `lint-gate.sh` (PostToolUse) | Runs ktlint (Android) or SwiftLint (iOS) after every file edit |
 | `done-gate.sh` (Stop) | Audits `git diff` on session end and warns about any protected-file touches |
 
-These hooks are **deterministic** — they run regardless of what this file says. CLAUDE.md is the fallback for behavior the hooks don't cover (logic, naming, structure). Never attempt to write to protected paths; the hook will block it and the task will stall.
+These hooks run automatically on every tool call and cover the most common enforcement cases. They are not a complete sandbox — compound shell commands, indirect writes, and novel bypass paths may not be caught. CLAUDE.md rules apply regardless; hooks are a safety net, not a substitute for following this protocol. Never attempt to write to protected paths — the hook will block the most direct attempts and the task will stall.
 
 ---
 
@@ -592,3 +592,13 @@ A well-executed task:
 - Context files are updated so the next agent session starts smarter
 - Completion report is honest — blocked criteria and new debt are surfaced, not hidden
 - Code follows CONVENTIONS.md exactly — naming, structure, patterns
+
+<!-- sdd:framework:end -->
+
+---
+
+<!-- sdd:custom:start — Add your project-specific rules and overrides below this line.
+     The SDD wizard preserves everything in this section on every update.
+     Examples: team-specific naming conventions, forbidden APIs, extra quality gates. -->
+
+<!-- sdd:custom:end -->

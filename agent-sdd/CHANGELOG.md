@@ -7,6 +7,57 @@ notes in the "Update available" banner so developers see what re-running setup b
 The generator (`engine/generate-embedded.js`) parses only the numbered version
 headings — the "Unreleased" section below is ignored until you promote it to a version.
 
+## 1.4 — 2026-06-18
+
+- **Surgical update mechanism**: the wizard now hash-checks CLAUDE.md, hooks, and templates
+  before overwriting — files you've modified are detected and never silently overwritten.
+- **Section markers in CLAUDE.md**: `<!-- sdd:framework:start/end -->` and
+  `<!-- sdd:custom:start/end -->` protect your project-specific rules during updates —
+  the wizard merges the new framework section while preserving your custom zone.
+- **`.sdd-manifest.json`** replaces `.sdd-version` — stores per-file content hashes so
+  the wizard knows exactly which files are safe to overwrite on the next update.
+- **Conflict UI**: when a modified file is detected, the wizard shows the new version with
+  Skip / Overwrite controls — your decision, never a silent overwrite.
+- **PR classification in Android PR review**: the review skill now detects PR type
+  (Feature / Bug Fix / Refactor / Task / Hotfix) from branch name and commit keywords
+  before reviewing, making severity judgements type-aware.
+
+**Update instructions for existing projects:**
+1. Pull the submodule: `git submodule update --remote agent-sdd`
+2. Open `agent-sdd/setup-wizard.html`, select your project folder — click "Update now".
+   The wizard will hash-check each file and show a conflict dialog for any you've modified.
+3. For hook fixes: re-copy scripts you haven't customized: `cp agent-sdd/hooks/scripts/*.sh .claude/hooks/scripts/`
+
+## 1.3 — 2026-06-13
+
+- **ARCHITECTURE.md round-trip**: re-opening the wizard on an existing project reads your
+  previous architectural choices (arch pattern, DI, UI, nav) back from `spec-kit/ARCHITECTURE.md`
+  so human corrections survive wizard re-runs without starting from scratch.
+- **CI drift check**: the wizard scans `.github/workflows/`, `fastlane/Fastfile`, and
+  `bitrise.yml` / `ci_scripts/` and surfaces mismatches between CI config and what CONVENTIONS.md
+  will say (JDK/Xcode version, ktlint/SwiftLint gate, coverage enforcement). Shown as an amber
+  banner at the top of the Conventions step.
+- **Auto-detected markers**: wizard-generated ARCHITECTURE.md now annotates every value that
+  was defaulted (not actually detected in the codebase) with a blockquote warning so teams know
+  which decisions need verification before committing.
+- **Deeper source walk**: `countSourceFiles` depth raised from 4 → 8, fixing undercount of
+  Kotlin/Java files in deeply nested multi-module projects.
+- **Multi-module includes**: `include ':app', ':core', ':feature-home'` in `settings.gradle`
+  now correctly captures all modules, not just the first argument.
+- **Hook language corrected**: CLAUDE.md no longer claims hooks are "deterministic" — they
+  cover common enforcement cases but are not a complete sandbox.
+- **Hook bugs fixed**: `lint-gate.sh` — three bugs patched (shell variable expansion, SwiftLint
+  CLI flag removed in 0.52+, `find -o` precedence). `git-guard.sh` — compound command handling.
+  `protected-paths.sh` — write-to-protected-path detection added.
+
+**Update instructions for existing projects:**
+1. Pull the submodule: `git submodule update --remote agent-sdd`
+2. Open `agent-sdd/setup-wizard.html`, select your project folder — wizard pre-fills from
+   your existing `spec-kit/ARCHITECTURE.md` (round-trip). Review, then re-save CLAUDE.md
+   (final step) to get the new snapshot.
+3. For hook fixes: `diff .claude/hooks/scripts/ agent-sdd/hooks/scripts/` and copy scripts
+   you haven't customized: `cp agent-sdd/hooks/scripts/*.sh .claude/hooks/scripts/`
+
 ## Unreleased (next version)
 
 - Plug-n-play skills: optional per-ticket instruction modules in `agent-artifacts/skills/`,
